@@ -1,0 +1,16 @@
+import { AuthProvider } from '@/components/AuthProvider';
+import ProtectedRoute from '@/components/ProtectedRoute';
+
+export default function DashboardLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <AuthProvider>
+      <ProtectedRoute>
+        {children}
+      </ProtectedRoute>
+    </AuthProvider>
+  );
+}
