@@ -1,12 +1,20 @@
 'use client';
 
 import { PHARMACY_INFO } from '@/lib/constants';
-import { Pill, Menu, X } from 'lucide-react';
+import { Pill, Menu, X, LogOut } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
+import { useAuth } from './AuthProvider';
 
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const { logout } = useAuth();
+
+  const handleLogout = () => {
+    if (confirm('Are you sure you want to logout?')) {
+      logout();
+    }
+  };
 
   return (
     <header className="bg-white border-b border-gray-100 sticky top-0 z-40">
@@ -47,6 +55,13 @@ export default function Header() {
             >
               History
             </Link>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-sm font-medium text-gray-500 hover:text-red-600 transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+              Logout
+            </button>
           </nav>
 
           {/* Mobile Menu Button */}
@@ -87,6 +102,13 @@ export default function Header() {
               >
                 History
               </Link>
+              <button
+                onClick={handleLogout}
+                className="px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 text-left flex items-center gap-2"
+              >
+                <LogOut className="w-4 h-4" />
+                Logout
+              </button>
             </nav>
           </div>
         )}
