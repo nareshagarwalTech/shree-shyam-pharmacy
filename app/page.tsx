@@ -28,7 +28,7 @@ type ViewMode = 'cards' | 'table';
 type FilterStatus = 'all' | 'overdue' | 'urgent' | 'soon' | 'ok';
 
 // Owner's WhatsApp number - UPDATE THIS
-const OWNER_PHONE = '919876543210'; // Change to your number
+const OWNER_PHONE = '919989802323'; // Change to your number
 
 export default function Dashboard() {
   const [reminders, setReminders] = useState<CustomerReminder[]>([]);
