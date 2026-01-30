@@ -13,6 +13,7 @@ import AddCustomerModal from '@/components/AddCustomerModal';
 import ImportModal from '@/components/ImportModal';
 import Toast from '@/components/Toast';
 import EmptyState from '@/components/EmptyState';
+import DailySummaryWidget from '@/components/DailySummaryWidget';
 import { 
   Search, 
   Plus, 
@@ -25,6 +26,9 @@ import {
 
 type ViewMode = 'cards' | 'table';
 type FilterStatus = 'all' | 'overdue' | 'urgent' | 'soon' | 'ok';
+
+// Owner's WhatsApp number - UPDATE THIS
+const OWNER_PHONE = '919876543210'; // Change to your number
 
 export default function Dashboard() {
   const [reminders, setReminders] = useState<CustomerReminder[]>([]);
@@ -133,11 +137,25 @@ export default function Dashboard() {
     total: reminders.length,
   };
 
+  // Get app URL for sharing
+  const appUrl = typeof window !== 'undefined' ? window.location.origin : '';
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-amber-50">
       <Header />
       
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Daily Summary Widget - Shows when there are pending reminders */}
+        {!loading && (stats.overdue > 0 || stats.urgent > 0) && (
+          <div className="mb-6">
+            <DailySummaryWidget 
+              stats={stats} 
+              ownerPhone={OWNER_PHONE}
+              appUrl={appUrl}
+            />
+          </div>
+        )}
+
         {/* Stats Cards */}
         <StatsCards stats={stats} onFilterClick={setFilterStatus} activeFilter={filterStatus} />
 
