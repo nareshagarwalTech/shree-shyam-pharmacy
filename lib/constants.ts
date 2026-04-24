@@ -1,17 +1,26 @@
-// Pharmacy Information - Edit these details
+// Pharmacy Information - single source of truth
 export const PHARMACY_INFO = {
   name: 'Shree Shyam Pharmacy',
-  phone: '+91 98765 43210', // Update with actual phone
-  whatsapp: '919876543210', // Update with actual WhatsApp (no + sign)
-  email: 'contact@shreeshyampharmacy.in',
-  address: 'Shop No. 12, Main Road, Kukatpally, Hyderabad, Telangana - 500072', // Update with actual address
-  mapLink: 'https://maps.google.com/?q=Kukatpally,Hyderabad',
   tagline: 'Your Health, Our Priority',
-  established: '2010',
+  phone: '+91 9100855455',
+  whatsapp: '919100855455',
+  email: 'contact@shreeshyampharmacy.com',
+  address: 'Dharam Karan Rd, Divyashakti Apartments, Ameerpet, Hyderabad, Telangana 500016',
+  shortAddress: 'Ameerpet, Hyderabad',
+  mapLink: 'https://maps.google.com/?q=Dharam+Karan+Rd,+Divyashakti+Apartments,+Ameerpet,+Hyderabad',
+  serviceAreas: ['Ameerpet', 'SR Nagar', 'Punjagutta', 'Sanjeeva Reddy Nagar'],
+  established: '1995',
+  yearsExperience: new Date().getFullYear() - 1995,
+  happyCustomers: '25,000+',
+  licenseNumber: 'DL No. TS/01/HYD/2021-23',
+  pharmacistName: 'Naresh Agarwal',
+  pharmacistCredentials: 'B.Pharm, Registered Pharmacist',
   hours: {
-    weekdays: '8:00 AM - 10:00 PM',
-    sunday: '9:00 AM - 2:00 PM',
+    weekdays: 'Mon - Sat: 8:00 AM - 10:00 PM',
+    sunday: 'Sunday: 9:00 AM - 2:00 PM',
   },
+  googleRating: 4.8,
+  googleReviews: 312,
 };
 
 // Reminder timing settings (in days)
