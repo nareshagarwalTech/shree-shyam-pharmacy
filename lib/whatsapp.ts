@@ -1,118 +1,83 @@
 import { PHARMACY_INFO, WHATSAPP_TEMPLATES } from './constants';
 
 /**
- * Generate WhatsApp click-to-chat URL
- * Opens WhatsApp with pre-filled message
+ * Generate a WhatsApp click-to-chat URL.
+ * Accepts any phone format — strips non-digits, prepends 91 if 10-digit.
  */
 export function generateWhatsAppUrl(phone: string, message: string): string {
-  // Clean phone number - remove spaces, dashes, etc.
-  let cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-  
-  // Add country code if not present (India = 91)
-  if (!cleanPhone.startsWith('+') && !cleanPhone.startsWith('91')) {
-    cleanPhone = '91' + cleanPhone;
-  }
-  if (cleanPhone.startsWith('+')) {
-    cleanPhone = cleanPhone.substring(1);
-  }
-  
-  // URL encode the message
+  let cleanPhone = String(phone).replace(/[\s\-\(\)+]/g, '');
+  if (cleanPhone.length === 10) cleanPhone = '91' + cleanPhone;
   const encodedMessage = encodeURIComponent(message);
-  
   return `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 }
 
-/**
- * Generate reminder message based on days until refill
- */
-export function generateReminderMessage(
-  customerName: string,
-  medicationName: string,
-  daysUntilRefill: number,
-  language: 'english' | 'telugu' = 'english'
-): string {
-  let daysText: string;
-  
+type Lang = 'en' | 'te' | 'hi';
+
+function daysPhrase(daysUntilRefill: number, lang: Lang): string {
+  const absDays = Math.abs(daysUntilRefill);
   if (daysUntilRefill < 0) {
-    const overdueDays = Math.abs(daysUntilRefill);
-    daysText = language === 'telugu' 
-      ? `${overdueDays} రోజులు ఆలస్యమైంది` 
-      : `is overdue by ${overdueDays} day${overdueDays > 1 ? 's' : ''}`;
-  } else if (daysUntilRefill === 0) {
-    daysText = language === 'telugu' 
-      ? 'ఈ రోజు రీఫిల్ చేయాలి' 
-      : 'needs refill today';
-  } else if (daysUntilRefill === 1) {
-    daysText = language === 'telugu' 
-      ? 'రేపు రీఫిల్ చేయాలి' 
-      : 'needs refill tomorrow';
-  } else {
-    daysText = language === 'telugu' 
-      ? `${daysUntilRefill} రోజుల్లో రీఫిల్ చేయాలి` 
-      : `is due for refill in ${daysUntilRefill} days`;
+    if (lang === 'te') return `${absDays} రోజుల క్రితం అయిపోయాయి`;
+    if (lang === 'hi') return `${absDays} दिन पहले खत्म हो गई हैं`;
+    return `ran out ${absDays} day${absDays > 1 ? 's' : ''} ago`;
   }
-  
-  if (language === 'telugu') {
-    return WHATSAPP_TEMPLATES.refillReminderTelugu(customerName, medicationName, daysText);
+  if (daysUntilRefill === 0) {
+    if (lang === 'te') return 'ఈ రోజు అయిపోతాయి';
+    if (lang === 'hi') return 'आज खत्म हो रही हैं';
+    return 'will run out today';
   }
-  
-  return WHATSAPP_TEMPLATES.refillReminder(customerName, medicationName, daysText);
+  if (daysUntilRefill === 1) {
+    if (lang === 'te') return 'రేపు అయిపోతాయి';
+    if (lang === 'hi') return 'कल खत्म हो रही हैं';
+    return 'will run out tomorrow';
+  }
+  if (lang === 'te') return `${daysUntilRefill} రోజుల్లో అయిపోతాయి`;
+  if (lang === 'hi') return `${daysUntilRefill} दिनों में खत्म हो जाएँगी`;
+  return `will run out in ${daysUntilRefill} days`;
 }
 
 /**
- * Open WhatsApp with reminder message
- * Returns true if window was opened
+ * Generate a customer-level refill reminder message (no medication detail).
+ */
+export function generateReminderMessage(
+  customerName: string,
+  daysUntilRefill: number,
+  language: Lang = 'en',
+): string {
+  const phrase = daysPhrase(daysUntilRefill, language);
+  if (language === 'te') return WHATSAPP_TEMPLATES.refillReminderTelugu(customerName, phrase);
+  if (language === 'hi') return WHATSAPP_TEMPLATES.refillReminderHindi(customerName, phrase);
+  return WHATSAPP_TEMPLATES.refillReminder(customerName, phrase);
+}
+
+/**
+ * Open a new-tab WhatsApp chat pre-filled with the reminder.
+ * Returns true if the window opened.
  */
 export function openWhatsAppReminder(
   phone: string,
   customerName: string,
-  medicationName: string,
   daysUntilRefill: number,
-  language: 'english' | 'telugu' = 'english'
+  language: Lang = 'en',
 ): boolean {
-  const message = generateReminderMessage(customerName, medicationName, daysUntilRefill, language);
+  const message = generateReminderMessage(customerName, daysUntilRefill, language);
   const url = generateWhatsAppUrl(phone, message);
-  
-  // Open in new tab
-  const newWindow = window.open(url, '_blank');
-  
-  return newWindow !== null;
+  return window.open(url, '_blank', 'noopener,noreferrer') !== null;
 }
 
-/**
- * Format phone number for display
- */
+/** Format 10-digit Indian number as "XXXXX XXXXX" */
 export function formatPhoneDisplay(phone: string): string {
-  const clean = phone.replace(/\D/g, '');
-  
-  // Indian format: XXXXX XXXXX
-  if (clean.length === 10) {
-    return `${clean.slice(0, 5)} ${clean.slice(5)}`;
-  }
-  
-  // With country code
-  if (clean.length === 12 && clean.startsWith('91')) {
-    return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`;
-  }
-  
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length === 10) return `${clean.slice(0, 5)} ${clean.slice(5)}`;
+  if (clean.length === 12 && clean.startsWith('91')) return `+91 ${clean.slice(2, 7)} ${clean.slice(7)}`;
   return phone;
 }
 
-/**
- * Validate Indian phone number
- */
+/** Indian 10-digit (starts 6-9) or 12-digit with 91 prefix */
 export function isValidIndianPhone(phone: string): boolean {
-  const clean = phone.replace(/\D/g, '');
-  
-  // 10 digits starting with 6-9
-  if (clean.length === 10 && /^[6-9]/.test(clean)) {
-    return true;
-  }
-  
-  // 12 digits with 91 prefix
-  if (clean.length === 12 && clean.startsWith('91') && /^91[6-9]/.test(clean)) {
-    return true;
-  }
-  
+  const clean = String(phone).replace(/\D/g, '');
+  if (clean.length === 10 && /^[6-9]/.test(clean)) return true;
+  if (clean.length === 12 && /^91[6-9]/.test(clean)) return true;
   return false;
 }
+
+export { PHARMACY_INFO };

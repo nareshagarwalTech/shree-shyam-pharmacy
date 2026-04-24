@@ -31,83 +31,95 @@ export const REMINDER_DAYS = {
   UPCOMING: 14,    // 14 days or less (for planning)
 };
 
-// Status colors for UI
+// Status colors for UI — must match SQL view customer_next_reminder.status
 export const STATUS_CONFIG = {
   overdue: {
     label: 'Overdue',
-    labelHindi: 'समय बीत गया',
     color: 'bg-red-100 text-red-800 border-red-200',
     dotColor: 'bg-red-500',
     priority: 1,
   },
   urgent: {
     label: 'Urgent',
-    labelHindi: 'जल्दी करें',
     color: 'bg-amber-100 text-amber-800 border-amber-200',
     dotColor: 'bg-amber-500',
     priority: 2,
   },
   soon: {
     label: 'Due Soon',
-    labelHindi: 'जल्द ही',
     color: 'bg-blue-100 text-blue-800 border-blue-200',
     dotColor: 'bg-blue-500',
     priority: 3,
   },
   ok: {
     label: 'OK',
-    labelHindi: 'ठीक है',
     color: 'bg-green-100 text-green-800 border-green-200',
     dotColor: 'bg-green-500',
     priority: 4,
   },
-};
+  paused: {
+    label: 'Paused',
+    color: 'bg-gray-100 text-gray-700 border-gray-200',
+    dotColor: 'bg-gray-400',
+    priority: 5,
+  },
+  opted_out: {
+    label: 'Opted Out',
+    color: 'bg-slate-100 text-slate-600 border-slate-200',
+    dotColor: 'bg-slate-400',
+    priority: 6,
+  },
+  no_sales: {
+    label: 'No Sales',
+    color: 'bg-stone-100 text-stone-600 border-stone-200',
+    dotColor: 'bg-stone-400',
+    priority: 7,
+  },
+} as const;
 
-// WhatsApp message templates
+// WhatsApp message templates — customer-level reminder based on last purchase
 export const WHATSAPP_TEMPLATES = {
-  refillReminder: (customerName: string, medication: string, daysText: string) => 
+  refillReminder: (customerName: string, daysText: string) =>
 `🏥 *${PHARMACY_INFO.name}*
 
 Namaste ${customerName} ji,
 
-This is a friendly reminder that your *${medication}* ${daysText}.
+This is a friendly reminder — your medicines ${daysText}.
 
-Please visit us or call to place your order.
+Please visit us or WhatsApp to place your refill order.
 
 📍 ${PHARMACY_INFO.address}
 📞 ${PHARMACY_INFO.phone}
 
 Thank you for choosing ${PHARMACY_INFO.name}! 🙏`,
 
-  // Telugu version
-  refillReminderTelugu: (customerName: string, medication: string, daysText: string) =>
+  refillReminderTelugu: (customerName: string, daysText: string) =>
 `🏥 *${PHARMACY_INFO.name}*
 
 నమస్కారం ${customerName} గారు,
 
-మీ *${medication}* ${daysText}.
+మీ మందులు ${daysText}.
 
-దయచేసి మా షాప్ కి రండి లేదా ఆర్డర్ చేయడానికి కాల్ చేయండి.
+దయచేసి మా షాప్ కి రండి లేదా ఆర్డర్ చేయడానికి WhatsApp చేయండి.
 
 📍 ${PHARMACY_INFO.address}
 📞 ${PHARMACY_INFO.phone}
 
 ${PHARMACY_INFO.name} ని ఎంచుకున్నందుకు ధన్యవాదాలు! 🙏`,
-};
 
-// Import column mappings
-export const IMPORT_COLUMNS = {
-  required: ['name', 'phone'],
-  optional: ['address', 'alternate_phone', 'notes', 'medication', 'quantity', 'daily_dosage', 'start_date'],
-  aliases: {
-    name: ['customer_name', 'customer', 'naam', 'పేరు'],
-    phone: ['mobile', 'phone_number', 'contact', 'mobile_no', 'ఫోన్'],
-    address: ['addr', 'location', 'చిరునామా'],
-    medication: ['medicine', 'med', 'drug', 'మందు'],
-    quantity: ['qty', 'tablets', 'pills', 'సంఖ్య'],
-    daily_dosage: ['dosage', 'per_day', 'daily', 'రోజుకు'],
-    start_date: ['date', 'purchase_date', 'bought_on', 'తేదీ'],
-  },
+  refillReminderHindi: (customerName: string, daysText: string) =>
+`🏥 *${PHARMACY_INFO.name}*
+
+Namaste ${customerName} ji,
+
+आपकी दवाइयाँ ${daysText}।
+
+कृपया दुकान पर आइए या WhatsApp पर ऑर्डर करें।
+
+📍 ${PHARMACY_INFO.address}
+📞 ${PHARMACY_INFO.phone}
+
+धन्यवाद! 🙏`,
 };
 
 // Pagination

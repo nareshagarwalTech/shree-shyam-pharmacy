@@ -1,20 +1,24 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import { formatPhoneDisplay } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
-import { MessageCircle, Phone, Calendar, Clock } from 'lucide-react';
+import { MessageCircle, Phone, Calendar, Clock, Receipt } from 'lucide-react';
 
 interface ReminderLog {
   id: string;
   customer_name: string;
   phone: string;
-  medication_name: string;
+  feed_no: string | null;
+  feed_date: string | null;
   channel: string;
+  send_method: string;
   status: string;
+  template_language: string;
   sent_at: string;
+  created_at: string;
 }
 
 export default function HistoryPage() {
@@ -23,71 +27,88 @@ export default function HistoryPage() {
   const [dateFilter, setDateFilter] = useState('all');
 
   const fetchHistory = useCallback(async () => {
-    try {
-      let query = supabase
-        .from('reminder_history')
-        .select(`id, channel, status, sent_at, customers (name, phone), medications (name)`)
-        .order('sent_at', { ascending: false })
-        .limit(100);
+    setLoading(true);
+    let query = supabase
+      .from('reminders')
+      .select(`
+        id, channel, send_method, status, template_language, sent_at, created_at,
+        customers ( name, phone ),
+        sales_transactions ( feed_no, feed_date )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
 
-      if (dateFilter === 'today') {
-        const today = new Date().toISOString().split('T')[0];
-        query = query.gte('sent_at', today);
-      } else if (dateFilter === 'week') {
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        query = query.gte('sent_at', weekAgo.toISOString());
-      } else if (dateFilter === 'month') {
-        const monthAgo = new Date();
-        monthAgo.setMonth(monthAgo.getMonth() - 1);
-        query = query.gte('sent_at', monthAgo.toISOString());
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
-
-      const formattedHistory: ReminderLog[] = (data || []).map((item: any) => ({
-        id: item.id,
-        customer_name: item.customers?.name || 'Unknown',
-        phone: item.customers?.phone || '',
-        medication_name: item.medications?.name || 'Unknown',
-        channel: item.channel,
-        status: item.status,
-        sent_at: item.sent_at,
-      }));
-
-      setHistory(formattedHistory);
-    } catch (error) {
-      console.error('Error fetching history:', error);
-    } finally {
-      setLoading(false);
+    if (dateFilter === 'today') {
+      query = query.gte('created_at', new Date().toISOString().slice(0, 10));
+    } else if (dateFilter === 'week') {
+      const d = new Date(Date.now() - 7 * 86400000);
+      query = query.gte('created_at', d.toISOString());
+    } else if (dateFilter === 'month') {
+      const d = new Date(Date.now() - 30 * 86400000);
+      query = query.gte('created_at', d.toISOString());
     }
+
+    const { data, error } = await query;
+    if (error) {
+      console.error(error);
+      setLoading(false);
+      return;
+    }
+
+    const formatted: ReminderLog[] = (data || []).map((row: any) => ({
+      id: row.id,
+      customer_name: row.customers?.name || 'Unknown',
+      phone: row.customers?.phone || '',
+      feed_no: row.sales_transactions?.feed_no ?? null,
+      feed_date: row.sales_transactions?.feed_date ?? null,
+      channel: row.channel,
+      send_method: row.send_method,
+      status: row.status,
+      template_language: row.template_language,
+      sent_at: row.sent_at,
+      created_at: row.created_at,
+    }));
+    setHistory(formatted);
+    setLoading(false);
   }, [dateFilter]);
 
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
 
-  const getChannelIcon = (channel: string) => {
-    switch (channel) {
-      case 'whatsapp': return <MessageCircle className="w-4 h-4 text-green-500" />;
-      case 'sms': return <MessageCircle className="w-4 h-4 text-blue-500" />;
-      case 'call': return <Phone className="w-4 h-4 text-purple-500" />;
-      default: return <MessageCircle className="w-4 h-4 text-gray-500" />;
-    }
+  const channelIcon = (ch: string) => {
+    if (ch === 'whatsapp') return <MessageCircle className="w-4 h-4 text-green-500" />;
+    if (ch === 'sms') return <MessageCircle className="w-4 h-4 text-blue-500" />;
+    if (ch === 'call') return <Phone className="w-4 h-4 text-purple-500" />;
+    return <MessageCircle className="w-4 h-4 text-gray-500" />;
+  };
+
+  const statusChip = (s: string) => {
+    const m: Record<string, string> = {
+      queued: 'bg-gray-100 text-gray-700',
+      sent: 'bg-green-100 text-green-700',
+      delivered: 'bg-blue-100 text-blue-700',
+      read: 'bg-emerald-100 text-emerald-700',
+      failed: 'bg-red-100 text-red-700',
+      cancelled: 'bg-slate-100 text-slate-700',
+    };
+    return (
+      <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${m[s] || m.queued}`}>
+        {s}
+      </span>
+    );
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
       <DashboardHeader />
-      
+
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Reminder History</h1>
-            <p className="text-gray-500">Track all sent reminders</p>
+            <h1 className="text-2xl font-display font-bold text-gray-900">Reminder History</h1>
+            <p className="text-sm text-gray-500">Audit log of reminders sent to customers.</p>
           </div>
-          
           <select
             value={dateFilter}
             onChange={(e) => setDateFilter(e.target.value)}
@@ -101,24 +122,28 @@ export default function HistoryPage() {
         </div>
 
         {loading ? (
-          <div className="flex items-center justify-center py-20"><div className="spinner"></div></div>
+          <div className="flex items-center justify-center py-20">
+            <div className="spinner" />
+          </div>
         ) : history.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-2">No reminders sent yet</h3>
-            <p className="text-gray-500">When you send WhatsApp reminders, they will appear here</p>
+            <p className="text-gray-500">Reminders will appear here once sent.</p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Date & Time</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Customer</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Medication</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Channel</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">Status</th>
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <Th>When</Th>
+                    <Th>Customer</Th>
+                    <Th>Triggered by (sale)</Th>
+                    <Th>Channel</Th>
+                    <Th>Method</Th>
+                    <Th>Lang</Th>
+                    <Th>Status</Th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -127,27 +152,40 @@ export default function HistoryPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-900">{formatDate(log.sent_at, 'dd MMM yyyy')}</span>
-                          <span className="text-gray-500">{formatDate(log.sent_at, 'hh:mm a')}</span>
+                          <span className="text-gray-900">
+                            {formatDate(log.sent_at || log.created_at, 'dd MMM yyyy')}
+                          </span>
+                          <span className="text-gray-500">
+                            {formatDate(log.sent_at || log.created_at, 'hh:mm a')}
+                          </span>
                         </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{log.customer_name}</div>
                         <div className="text-sm text-gray-500">{formatPhoneDisplay(log.phone)}</div>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-700">{log.medication_name}</td>
+                      <td className="px-4 py-3">
+                        {log.feed_no ? (
+                          <div className="flex items-center gap-1.5 text-sm text-gray-700">
+                            <Receipt className="w-4 h-4 text-emerald-500" />
+                            <span>#{log.feed_no}</span>
+                            {log.feed_date && (
+                              <span className="text-gray-400">· {formatDate(log.feed_date)}</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          {getChannelIcon(log.channel)}
+                          {channelIcon(log.channel)}
                           <span className="text-sm capitalize text-gray-700">{log.channel}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                          log.status === 'sent' ? 'bg-green-100 text-green-700' : 
-                          log.status === 'delivered' ? 'bg-blue-100 text-blue-700' : 'bg-red-100 text-red-700'
-                        }`}>{log.status}</span>
-                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-500 font-mono">{log.send_method}</td>
+                      <td className="px-4 py-3 text-xs uppercase text-gray-600">{log.template_language}</td>
+                      <td className="px-4 py-3">{statusChip(log.status)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -157,5 +195,13 @@ export default function HistoryPage() {
         )}
       </main>
     </div>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+      {children}
+    </th>
   );
 }

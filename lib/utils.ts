@@ -1,20 +1,5 @@
-import { format, parseISO, differenceInDays, addDays, isValid, parse } from 'date-fns';
+import { format, parseISO, differenceInDays, isValid, parse } from 'date-fns';
 import { DATE_FORMAT, DATE_FORMAT_SHORT } from './constants';
-
-/**
- * Calculate refill date based on quantity and daily dosage
- */
-export function calculateRefillDate(
-  startDate: Date | string,
-  quantity: number,
-  dailyDosage: number,
-  bufferDays: number = 3
-): Date {
-  const start = typeof startDate === 'string' ? parseISO(startDate) : startDate;
-  const daysSupply = Math.floor(quantity / dailyDosage);
-  const refillDate = addDays(start, daysSupply - bufferDays);
-  return refillDate;
-}
 
 /**
  * Format date for display

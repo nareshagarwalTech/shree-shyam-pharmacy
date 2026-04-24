@@ -1,7 +1,7 @@
 'use client';
 
 import { PHARMACY_INFO } from '@/lib/constants';
-import { Pill, Menu, X, LogOut, Home, Users, History, LayoutDashboard } from 'lucide-react';
+import { Pill, Menu, X, LogOut, Home, Users, History, LayoutDashboard, Tags, Upload } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from './AuthProvider';
@@ -51,15 +51,29 @@ export default function DashboardHeader() {
               <LayoutDashboard className="w-4 h-4" />
               Dashboard
             </Link>
-            <Link 
-              href="/dashboard/customers" 
+            <Link
+              href="/dashboard/customers"
               className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
             >
               <Users className="w-4 h-4" />
               Customers
             </Link>
-            <Link 
-              href="/dashboard/history" 
+            <Link
+              href="/dashboard/groups"
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <Tags className="w-4 h-4" />
+              Groups
+            </Link>
+            <Link
+              href="/dashboard/sales-upload"
+              className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Sales
+            </Link>
+            <Link
+              href="/dashboard/history"
               className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900"
             >
               <History className="w-4 h-4" />
@@ -107,16 +121,32 @@ export default function DashboardHeader() {
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
               </Link>
-              <Link 
-                href="/dashboard/customers" 
+              <Link
+                href="/dashboard/customers"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 <Users className="w-4 h-4" />
                 Customers
               </Link>
-              <Link 
-                href="/dashboard/history" 
+              <Link
+                href="/dashboard/groups"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Tags className="w-4 h-4" />
+                Groups
+              </Link>
+              <Link
+                href="/dashboard/sales-upload"
+                className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Upload className="w-4 h-4" />
+                Upload Sales
+              </Link>
+              <Link
+                href="/dashboard/history"
                 className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50"
                 onClick={() => setMobileMenuOpen(false)}
               >
