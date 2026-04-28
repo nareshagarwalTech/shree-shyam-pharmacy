@@ -12,12 +12,28 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- =============================================================================
--- Drop old model (old data is being re-imported, so safe to drop)
+-- Drop EVERYTHING (old + new) — idempotent re-run
 -- =============================================================================
-DROP VIEW  IF EXISTS customer_reminders CASCADE;
+-- Views first (depend on tables)
+DROP VIEW  IF EXISTS customer_with_groups   CASCADE;
+DROP VIEW  IF EXISTS customer_next_reminder CASCADE;
+DROP VIEW  IF EXISTS customer_reminders     CASCADE;
+
+-- New tables
+DROP TABLE IF EXISTS reminders          CASCADE;
+DROP TABLE IF EXISTS import_batches     CASCADE;
+DROP TABLE IF EXISTS sales_transactions CASCADE;
+DROP TABLE IF EXISTS customer_groups    CASCADE;
+DROP TABLE IF EXISTS groups             CASCADE;
+
+-- Old tables
 DROP TABLE IF EXISTS reminder_history   CASCADE;
 DROP TABLE IF EXISTS medications        CASCADE;
 DROP TABLE IF EXISTS customers          CASCADE;
+
+-- Functions
+DROP FUNCTION IF EXISTS compute_reminder_date()  CASCADE;
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
 
 -- =============================================================================
 -- 1. GROUPS (master list of customer groups / tags)
