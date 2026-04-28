@@ -279,7 +279,19 @@ FROM customers c
 WHERE c.is_active = true;
 
 -- =============================================================================
--- 11. SEED: default groups
+-- 11. RLS — DISABLE for now (staff-only app behind a password)
+-- =============================================================================
+-- Phase 5+ TODO: replace this with Supabase Auth + per-row policies and
+-- move all writes to server-side API routes using the service-role key.
+ALTER TABLE groups              DISABLE ROW LEVEL SECURITY;
+ALTER TABLE customers           DISABLE ROW LEVEL SECURITY;
+ALTER TABLE customer_groups     DISABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_transactions  DISABLE ROW LEVEL SECURITY;
+ALTER TABLE import_batches      DISABLE ROW LEVEL SECURITY;
+ALTER TABLE reminders           DISABLE ROW LEVEL SECURITY;
+
+-- =============================================================================
+-- 12. SEED: default groups
 -- =============================================================================
 INSERT INTO groups (slug, name, description, color, icon, sort_order, is_system) VALUES
     ('regular',          'Regular Customers', 'Walk-in and returning customers',           '#2f8658', '🛒', 10, true),

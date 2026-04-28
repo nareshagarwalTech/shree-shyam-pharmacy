@@ -106,12 +106,20 @@ export default function SalesUploadPage() {
     const newList = Object.values(newCustomers);
     let created = 0;
     if (newList.length) {
-      // Upsert to avoid collision with concurrent batches
-      const { error } = await supabase.from('customers').upsert(newList, {
-        onConflict: 'phone',
-        ignoreDuplicates: true,
-      });
-      if (!error) created = newList.length;
+      // Plain INSERT — partial unique index on phone can't be used for ON CONFLICT.
+      // Filter against existing phones first.
+      const phonesToCheck = newList.map((c) => c.phone);
+      const { data: existing } = await supabase
+        .from('customers')
+        .select('phone')
+        .in('phone', phonesToCheck)
+        .eq('is_active', true);
+      const existingSet = new Set((existing || []).map((c) => c.phone));
+      const toInsert = newList.filter((c) => !existingSet.has(c.phone));
+      if (toInsert.length) {
+        const { error } = await supabase.from('customers').insert(toInsert);
+        if (!error) created = toInsert.length;
+      }
     }
 
     // 2) Re-fetch id mapping for any auto-created or previously-known phones

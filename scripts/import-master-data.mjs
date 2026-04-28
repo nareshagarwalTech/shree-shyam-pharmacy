@@ -367,14 +367,19 @@ async function importSales(salesRows, batchId) {
         });
     }
 
-    // Insert any new customers; use upsert in case two sales in this batch share a new phone
+    // Insert any new customers (plain INSERT — partial unique index can't be used as ON CONFLICT target).
+    // Filter against existing phones first to avoid duplicate-key errors on re-runs.
     if (newCustomers.length) {
         const deduped = [...new Map(newCustomers.map(c => [c.phone, c])).values()];
-        console.log(`   ↳ auto-creating ${deduped.length} new customers (unknown phones)…`);
-        for (let i = 0; i < deduped.length; i += 200) {
-            await supabase.from('customers').upsert(deduped.slice(i, i + 200), {
-                onConflict: 'phone', ignoreDuplicates: true,
-            });
+        const phones = deduped.map(c => c.phone);
+        const { data: existing } = await supabase
+            .from('customers').select('phone').in('phone', phones).eq('is_active', true);
+        const existingSet = new Set((existing || []).map(c => c.phone));
+        const toInsert = deduped.filter(c => !existingSet.has(c.phone));
+        console.log(`   ↳ auto-creating ${toInsert.length} new customers (unknown phones)…`);
+        for (let i = 0; i < toInsert.length; i += 200) {
+            const { error } = await supabase.from('customers').insert(toInsert.slice(i, i + 200));
+            if (error) console.error(`   ⚠️ auto-create error: ${error.message}`);
         }
     }
 
