@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { supabase, CustomerNextReminder, Group, ReminderStatus } from '@/lib/supabase';
-import { openWhatsAppReminder } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
 import StatsCards from '@/components/StatsCards';
 import CustomerCard from '@/components/CustomerCard';
@@ -93,38 +92,80 @@ export default function DashboardPage() {
   }), [reminders]);
 
   const handleSendReminder = async (r: CustomerNextReminder) => {
-    const days = r.days_until_reminder ?? 0;
-    const opened = openWhatsAppReminder(r.phone, r.customer_name, days, r.preferred_language);
-    if (!opened) {
-      setToast({ message: 'Could not open WhatsApp.', type: 'error' });
-      return;
-    }
     try {
-      await supabase.from('reminders').insert({
-        customer_id: r.customer_id,
-        sales_transaction_id: r.last_sale_id,
-        scheduled_for: r.reminder_trigger_date,
-        channel: 'whatsapp',
-        send_method: 'manual_walink',
-        status: 'sent',
-        template_language: r.preferred_language,
-        sent_at: new Date().toISOString(),
+      const res = await fetch('/api/send-reminder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customer_id: r.customer_id,
+          language: r.preferred_language,
+        }),
       });
-      setToast({ message: 'Reminder logged. Send the message on WhatsApp.', type: 'success' });
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) {
+        setToast({
+          message: `Send failed: ${json.error || res.statusText}`,
+          type: 'error',
+        });
+        return;
+      }
+
+      // Direct API send succeeded
+      if (json.message_id) {
+        setToast({
+          message: `Sent via WhatsApp API ✓ (${json.message_id.slice(-8)})`,
+          type: 'success',
+        });
+      }
+
+      // wa.me fallback — open the prefilled chat
+      if (json.fallback_url) {
+        window.open(json.fallback_url, '_blank', 'noopener,noreferrer');
+        setToast({
+          message: 'API not configured — opened wa.me. Press Send in WhatsApp.',
+          type: 'success',
+        });
+      }
+
       setTimeout(fetchAll, 800);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setToast({ message: `Send error: ${err.message}`, type: 'error' });
     }
   };
 
   const handleBulkSend = async () => {
     const toSend = filtered.filter((r) => selected.has(r.customer_id));
     if (!toSend.length) return;
+    let ok = 0;
+    let fail = 0;
     for (const r of toSend) {
-      await handleSendReminder(r);
-      await new Promise((res) => setTimeout(res, 350));   // small stagger to avoid popup blocker
+      try {
+        const res = await fetch('/api/send-reminder', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ customer_id: r.customer_id, language: r.preferred_language }),
+        });
+        const json = await res.json();
+        if (res.ok && json.ok) {
+          ok++;
+          if (json.fallback_url) window.open(json.fallback_url, '_blank', 'noopener,noreferrer');
+        } else {
+          fail++;
+        }
+      } catch {
+        fail++;
+      }
+      // gentle pacing — Meta is happiest under 5 msgs/sec for new numbers
+      await new Promise((res) => setTimeout(res, 350));
     }
+    setToast({
+      message: `Bulk send: ${ok} succeeded, ${fail} failed.`,
+      type: fail > 0 ? 'error' : 'success',
+    });
     setSelected(new Set());
+    setTimeout(fetchAll, 800);
   };
 
   const toggleSelect = (id: string) =>
