@@ -152,6 +152,10 @@ function readDeliverySheet() {
       modeRaw === '' || modeRaw === '-' || modeRaw === '—' ? null :
       modeRaw === 'credit' ? 'credit' : null;
 
+    const explicitPayDate = parseDate(paymentDateRaw);
+    // If money was paid but no explicit payment_date column, default to delivery_date.
+    const paymentDate = explicitPayDate || (customerPaid > 0 ? deliveryDate : null);
+
     out.push({
       feed_no:           deriveFeedNo(billLabel, phone, deliveryDate),
       bill_no_label:     billLabel || null,
@@ -166,7 +170,7 @@ function readDeliverySheet() {
       payment_mode:      paymentMode,
       customer_paid:     customerPaid || 0,
       balance_left:      balanceLeft != null ? balanceLeft : (totalDue - customerPaid),
-      payment_date:      parseDate(paymentDateRaw),
+      payment_date:      paymentDate,
     });
   }
   return out;
