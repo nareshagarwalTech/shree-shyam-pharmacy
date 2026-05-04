@@ -394,7 +394,83 @@ export default function CustomerStatementPage() {
                   <p className="text-gray-500">No transactions yet.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <>
+                {/* Mobile cards */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {ledger.map((row, i) => {
+                    const isBill = row.kind === 'bill';
+                    const running = row.running ?? 0;
+                    return (
+                      <div key={i} className="p-3 flex items-start gap-3">
+                        <div className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center text-white ${
+                          isBill ? 'bg-blue-500' :
+                          row.mode === 'cash' ? 'bg-emerald-500' :
+                          row.mode === 'online' ? 'bg-cyan-500' : 'bg-amber-500'
+                        }`}>
+                          {isBill ? <ArrowUpCircle className="w-4 h-4" /> : <ArrowDownCircle className="w-4 h-4" />}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <div className="font-medium text-sm text-gray-900 truncate">
+                              {isBill ? `Bill #${row.label}` : `Payment · ${row.mode}`}
+                            </div>
+                            <div className={`font-semibold text-sm whitespace-nowrap ${
+                              isBill ? 'text-gray-900' : 'text-emerald-700'
+                            }`}>
+                              {isBill ? '+' : '−'}₹{Math.abs(Number(row.bill?.net_amount || row.payment?.amount || 0)).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
+                            <span>{formatDate(row.date)}</span>
+                            {row.detail && (
+                              <>
+                                <span className="text-gray-300">·</span>
+                                <span className="truncate">{row.detail}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between mt-1.5">
+                            <div className={`text-xs font-semibold ${
+                              running > 0 ? 'text-red-600' : running < 0 ? 'text-amber-600' : 'text-gray-400'
+                            }`}>
+                              Balance: ₹{Math.abs(running).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                              {running < 0 && ' cr'}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              {isBill && row.bill && (Number(row.bill.net_amount || 0) > 0) && (
+                                <button
+                                  onClick={() => quickPayBill(row.bill!)}
+                                  className="px-2 py-1 text-[11px] rounded-md text-emerald-700 bg-emerald-50 hover:bg-emerald-100 font-semibold"
+                                >
+                                  Pay
+                                </button>
+                              )}
+                              <button
+                                onClick={() => isBill ? setEditingBill(row.bill!) : setEditingPayment(row.payment!)}
+                                className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded"
+                              >
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Footer */}
+                  <div className="bg-gray-50 px-3 py-3 flex items-center justify-between text-sm">
+                    <span className="font-semibold text-gray-700 uppercase text-xs">Current balance</span>
+                    <span className={`font-display font-bold text-lg ${
+                      Number(balance.outstanding) > 0 ? 'text-red-600' : 'text-emerald-600'
+                    }`}>
+                      ₹{Number(balance.outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      {Number(balance.outstanding) === 0 && <CheckCircle className="w-4 h-4 inline ml-1" />}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-100">
                       <tr>
@@ -504,6 +580,7 @@ export default function CustomerStatementPage() {
                     </tfoot>
                   </table>
                 </div>
+                </>
               )}
             </div>
           </>
