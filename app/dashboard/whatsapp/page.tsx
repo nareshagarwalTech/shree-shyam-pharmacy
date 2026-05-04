@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { supabase, CustomerNextReminder } from '@/lib/supabase';
 import {
   formatPhoneDisplay,
-  pickReminder,
+  pickReminderFromTemplates,
+  loadMessageTemplates,
+  MessageTemplate,
   generateWhatsAppUrl,
   markReminderSent,
   undoReminderSent,
@@ -24,6 +26,9 @@ import {
   Phone,
   Send,
   Undo2,
+  Pencil,
+  Settings,
+  RotateCcw,
 } from 'lucide-react';
 
 type FilterKind = 'all' | 'due' | 'refill' | 'overdue';
@@ -39,6 +44,7 @@ interface RowState {
 
 export default function WhatsAppCenterPage() {
   const [reminders, setReminders] = useState<CustomerNextReminder[]>([]);
+  const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [sentToday, setSentToday] = useState<Map<string, { id: string; sent_at: string }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -46,17 +52,20 @@ export default function WhatsAppCenterPage() {
   const [filter, setFilter] = useState<FilterKind>('all');
   const [hideSent, setHideSent] = useState(true);
   const [showPreview, setShowPreview] = useState<string | null>(null);
+  // Per-customer message overrides (when staff edits the preview)
+  const [edits, setEdits] = useState<Map<string, string>>(new Map());
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error'; undo?: () => void } | null>(null);
 
   const fetchAll = useCallback(async () => {
-    const { data, error } = await supabase
-      .from('customer_next_reminder')
-      .select('*');
+    const [{ data, error }, tmpls] = await Promise.all([
+      supabase.from('customer_next_reminder').select('*'),
+      loadMessageTemplates(),
+    ]);
+    setTemplates(tmpls);
     if (error) {
       setToast({ message: error.message, type: 'error' });
     } else {
       const all = (data || []) as CustomerNextReminder[];
-      // Only include those who actually need a reminder (outstanding > 0 OR refill due)
       const needs = all.filter((r) => {
         const outstanding = Number((r as any).outstanding || 0);
         const days = r.days_until_reminder;
@@ -64,7 +73,6 @@ export default function WhatsAppCenterPage() {
         return outstanding > 0 || refillDue;
       });
       setReminders(needs);
-      // Get sent-today map
       const map = await getRemindersSentToday(needs.map((r) => r.customer_id));
       setSentToday(map);
     }
@@ -77,11 +85,15 @@ export default function WhatsAppCenterPage() {
   const rows: RowState[] = useMemo(() => {
     return reminders
       .map((r) => {
-        const pick = pickReminder({
+        const pick = pickReminderFromTemplates({
           customerName: r.customer_name,
           outstanding: Number((r as any).outstanding || 0),
           daysUntilRefill: r.days_until_reminder,
           language: r.preferred_language,
+          phone: r.phone,
+          address: r.address,
+          lastPurchaseDate: r.last_purchase_date,
+          templates,
         });
         if (!pick) return null;
         return {
@@ -93,7 +105,23 @@ export default function WhatsAppCenterPage() {
         };
       })
       .filter((x): x is RowState => x !== null);
-  }, [reminders, sentToday]);
+  }, [reminders, sentToday, templates]);
+
+  // Resolve the message to actually send: edited override > template-rendered
+  const messageFor = (r: RowState): string => edits.get(r.customer.customer_id) ?? r.message;
+  const isEdited = (r: RowState): boolean => edits.has(r.customer.customer_id);
+  const setMessage = (customerId: string, msg: string) =>
+    setEdits((prev) => {
+      const next = new Map(prev);
+      next.set(customerId, msg);
+      return next;
+    });
+  const resetMessage = (customerId: string) =>
+    setEdits((prev) => {
+      const next = new Map(prev);
+      next.delete(customerId);
+      return next;
+    });
 
   const filtered = useMemo(() => {
     let out = rows;
@@ -131,7 +159,7 @@ export default function WhatsAppCenterPage() {
   }, [rows]);
 
   const openWA = (r: RowState) => {
-    const url = generateWhatsAppUrl(r.customer.phone, r.message);
+    const url = generateWhatsAppUrl(r.customer.phone, messageFor(r));
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
@@ -139,9 +167,9 @@ export default function WhatsAppCenterPage() {
     const result = await markReminderSent({
       customerId: r.customer.customer_id,
       salesTransactionId: r.customer.last_sale_id,
-      templateName: r.templateName,
+      templateName: isEdited(r) ? `${r.templateName} (edited)` : r.templateName,
       templateLanguage: r.customer.preferred_language,
-      messageContent: r.message,
+      messageContent: messageFor(r),
     });
     if (!result.ok) {
       setToast({ message: result.error || 'Failed to mark sent', type: 'error' });
@@ -208,12 +236,22 @@ export default function WhatsAppCenterPage() {
               Click <strong>Open</strong> to launch the WhatsApp app with the message ready, then click <strong>Mark Sent</strong> after sending.
             </p>
           </div>
-          <button
-            onClick={() => { setRefreshing(true); fetchAll(); }}
-            className="p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50"
-          >
-            <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-2">
+            <Link
+              href="/dashboard/settings/templates"
+              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
+              title="Edit message templates"
+            >
+              <Settings className="w-4 h-4" />
+              <span className="hidden sm:inline">Templates</span>
+            </Link>
+            <button
+              onClick={() => { setRefreshing(true); fetchAll(); }}
+              className="p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50"
+            >
+              <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* Stat tiles */}
@@ -355,9 +393,12 @@ export default function WhatsAppCenterPage() {
                     <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={() => setShowPreview(showPreview === r.customer.customer_id ? null : r.customer.customer_id)}
-                        className="text-xs text-gray-500 hover:text-gray-700 underline"
+                        className={`text-xs underline flex items-center gap-1 ${
+                          isEdited(r) ? 'text-amber-600 font-medium' : 'text-gray-500 hover:text-gray-700'
+                        }`}
                       >
-                        {showPreview === r.customer.customer_id ? 'Hide' : 'Preview'} message
+                        {isEdited(r) && <Pencil className="w-3 h-3" />}
+                        {showPreview === r.customer.customer_id ? 'Hide' : isEdited(r) ? 'Edited' : 'Preview / Edit'} message
                       </button>
                       {sent ? (
                         <>
@@ -406,7 +447,42 @@ export default function WhatsAppCenterPage() {
 
                   {showPreview === r.customer.customer_id && (
                     <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                      <pre className="text-xs text-gray-700 whitespace-pre-wrap font-sans">{r.message}</pre>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] uppercase font-semibold text-gray-500">
+                          {isEdited(r) ? 'Edited message (sent as-is to WhatsApp)' : 'Message preview — edit below to customise'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {isEdited(r) && (
+                            <button
+                              onClick={() => resetMessage(r.customer.customer_id)}
+                              className="flex items-center gap-1 text-[11px] text-gray-500 hover:text-gray-700"
+                              title="Reset to template"
+                            >
+                              <RotateCcw className="w-3 h-3" />
+                              Reset to template
+                            </button>
+                          )}
+                          <Link
+                            href="/dashboard/settings/templates"
+                            className="flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700"
+                          >
+                            <Settings className="w-3 h-3" />
+                            Edit template
+                          </Link>
+                        </div>
+                      </div>
+                      <textarea
+                        value={messageFor(r)}
+                        onChange={(e) => setMessage(r.customer.customer_id, e.target.value)}
+                        rows={Math.max(6, messageFor(r).split('\n').length + 1)}
+                        className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white font-sans text-xs text-gray-800 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                        placeholder="Type your message…"
+                      />
+                      <div className="flex items-center gap-3 mt-2 text-[10px] text-gray-500">
+                        <span>{messageFor(r).length} chars</span>
+                        <span>·</span>
+                        <span>This edit applies only to <strong className="text-gray-700">{r.customer.customer_name}</strong> for this session — to change wording for everyone, edit the <Link href="/dashboard/settings/templates" className="text-emerald-600 hover:underline">template</Link>.</span>
+                      </div>
                     </div>
                   )}
                 </div>

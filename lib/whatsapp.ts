@@ -135,6 +135,153 @@ export interface ReminderPick {
   reasonLabel: string;      // for UI ("₹15,340 outstanding · refill 2 days overdue")
 }
 
+// Editable templates from migration 006
+export interface MessageTemplate {
+  id: string;
+  slug: string;
+  kind: 'refill' | 'due';
+  language: Lang;
+  label: string;
+  body: string;
+  is_active: boolean;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RenderVars {
+  customer_name: string;
+  outstanding: number;          // raw number; rendered as ₹X,XXX
+  days_until_refill: number | null;
+  phone?: string;
+  address?: string | null;
+  last_purchase_date?: string | null;
+}
+
+/**
+ * Render a template body, substituting {{placeholders}} with values.
+ * Unknown placeholders are left in place (helps debug).
+ */
+export function renderTemplate(body: string, vars: RenderVars, lang: Lang = 'en'): string {
+  const customerName = vars.customer_name.trim();
+  const firstName = customerName.split(/\s+/)[0] || customerName;
+  const outRupees = `₹${Math.round(vars.outstanding).toLocaleString('en-IN')}`;
+  const days = vars.days_until_refill;
+  const renderedDaysPhrase =
+    days === null || days === undefined ? '' : daysPhrase(days, lang);
+  const today = new Date().toLocaleDateString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+  });
+
+  const dict: Record<string, string> = {
+    customer_name:        customerName,
+    customer_first_name:  firstName,
+    outstanding:          outRupees,
+    outstanding_amount:   String(Math.round(vars.outstanding)),
+    days_until_refill:    days === null || days === undefined ? '' : String(days),
+    days_phrase:          renderedDaysPhrase,
+    phone:                vars.phone || '',
+    address:              vars.address || '',
+    last_purchase_date:   vars.last_purchase_date || '',
+    shop_name:            PHARMACY_INFO.name,
+    shop_phone:           PHARMACY_INFO.phone,
+    shop_address:         PHARMACY_INFO.address,
+    date:                 today,
+  };
+
+  return body.replace(/\{\{\s*([a-zA-Z_]+)\s*\}\}/g, (_match, key) => {
+    const k = String(key).toLowerCase();
+    return dict[k] !== undefined ? dict[k] : `{{${key}}}`;
+  });
+}
+
+/**
+ * Load all active message templates from Supabase.
+ * Cache on the client and pass to pickReminderFromTemplates.
+ */
+export async function loadMessageTemplates(): Promise<MessageTemplate[]> {
+  const { data, error } = await supabase
+    .from('message_templates')
+    .select('*')
+    .eq('is_active', true)
+    .order('kind')
+    .order('language');
+  if (error) {
+    console.error('loadMessageTemplates:', error.message);
+    return [];
+  }
+  return (data || []) as MessageTemplate[];
+}
+
+/**
+ * Build a ReminderPick using DB-loaded templates (preferred over the hardcoded
+ * pickReminder()). Falls back to the hardcoded version if no template matches.
+ */
+export function pickReminderFromTemplates(opts: {
+  customerName: string;
+  outstanding: number;
+  daysUntilRefill: number | null;
+  language?: Lang;
+  phone?: string;
+  address?: string | null;
+  lastPurchaseDate?: string | null;
+  templates: MessageTemplate[];
+}): ReminderPick | null {
+  const lang = opts.language ?? 'en';
+  const owesMoney = opts.outstanding > 0;
+  const refillDue = opts.daysUntilRefill !== null && opts.daysUntilRefill <= 7;
+  if (!owesMoney && !refillDue) return null;
+
+  const parts: string[] = [];
+  if (owesMoney) {
+    parts.push(`₹${Math.round(opts.outstanding).toLocaleString('en-IN')} outstanding`);
+  }
+  if (refillDue) {
+    const d = opts.daysUntilRefill!;
+    parts.push(
+      d < 0 ? `refill ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} overdue` :
+      d === 0 ? 'refill due today' :
+      d === 1 ? 'refill due tomorrow' :
+      `refill in ${d} days`
+    );
+  }
+  const reasonLabel = parts.join(' · ');
+
+  const wantedKind: 'refill' | 'due' = owesMoney ? 'due' : 'refill';
+  const tmpl =
+    opts.templates.find((t) => t.is_active && t.kind === wantedKind && t.language === lang) ||
+    opts.templates.find((t) => t.is_active && t.kind === wantedKind && t.language === 'en');
+
+  if (!tmpl) {
+    // Fallback to hardcoded
+    const fallback = pickReminder({
+      customerName: opts.customerName,
+      outstanding: opts.outstanding,
+      daysUntilRefill: opts.daysUntilRefill,
+      language: lang,
+    });
+    return fallback;
+  }
+
+  const message = renderTemplate(tmpl.body, {
+    customer_name: opts.customerName,
+    outstanding: opts.outstanding,
+    days_until_refill: opts.daysUntilRefill,
+    phone: opts.phone,
+    address: opts.address,
+    last_purchase_date: opts.lastPurchaseDate,
+  }, lang);
+
+  return {
+    kind: refillDue && owesMoney ? 'combined' : wantedKind,
+    message,
+    templateName: tmpl.slug,
+    reasonLabel,
+  };
+}
+
+// Re-export for places that still import the legacy hardcoded picker
+
 interface PickInput {
   customerName: string;
   outstanding: number;

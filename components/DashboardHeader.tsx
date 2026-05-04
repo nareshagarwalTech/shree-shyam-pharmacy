@@ -18,6 +18,7 @@ import {
   ChevronDown,
   TrendingUp,
   MessageCircle,
+  MessageSquareText,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -33,15 +34,16 @@ const PRIMARY = [
 ];
 
 const MORE = [
-  { href: '/dashboard/customers',       label: 'Customers',          icon: Users },
-  { href: '/dashboard/top-customers',   label: 'Top Customers',      icon: TrendingUp },
-  { href: '/dashboard/daily-summary',   label: 'Daily Collection',   icon: BarChart3 },
-  { href: '/dashboard/monthly-summary', label: 'Monthly Collection', icon: BarChart3 },
-  { href: '/dashboard/aging',           label: 'Aging Report',       icon: AlertTriangle },
-  { href: '/dashboard/groups',          label: 'Groups',             icon: Tags },
-  { href: '/dashboard/sales-upload',    label: 'Upload Sales',       icon: Upload },
-  { href: '/dashboard/history',         label: 'WhatsApp Log',       icon: History },
-  { href: '/',                          label: 'Public site',        icon: Home },
+  { href: '/dashboard/customers',          label: 'Customers',          icon: Users },
+  { href: '/dashboard/top-customers',      label: 'Top Customers',      icon: TrendingUp },
+  { href: '/dashboard/daily-summary',      label: 'Daily Collection',   icon: BarChart3 },
+  { href: '/dashboard/monthly-summary',    label: 'Monthly Collection', icon: BarChart3 },
+  { href: '/dashboard/aging',              label: 'Aging Report',       icon: AlertTriangle },
+  { href: '/dashboard/groups',             label: 'Groups',             icon: Tags },
+  { href: '/dashboard/sales-upload',       label: 'Upload Sales',       icon: Upload },
+  { href: '/dashboard/history',            label: 'WhatsApp Log',       icon: History },
+  { href: '/dashboard/settings/templates', label: 'Message Templates',  icon: MessageSquareText },
+  { href: '/',                             label: 'Public site',        icon: Home },
 ];
 
 export default function DashboardHeader() {
