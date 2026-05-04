@@ -248,15 +248,15 @@ export default function DashboardPage() {
           activeFilter={filterStatus}
         />
 
-        <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+        <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4">
+          <div className="flex flex-col lg:flex-row gap-2 sm:gap-3 items-stretch lg:items-center justify-between">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search name, phone, or bill #"
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               />
             </div>
 
@@ -264,7 +264,7 @@ export default function DashboardPage() {
               <select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value as FilterStatus)}
-                className="px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="flex-1 sm:flex-initial px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="all">All Status</option>
                 <option value="overdue">🔴 Overdue</option>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
               <select
                 value={filterGroup}
                 onChange={(e) => setFilterGroup(e.target.value)}
-                className="px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                className="flex-1 sm:flex-initial px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
               >
                 <option value="all">All Groups</option>
                 {groups.map((g) => (

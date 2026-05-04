@@ -77,7 +77,7 @@ export default function ReportsHubPage() {
             <div className="spinner mx-auto" />
           </div>
         ) : snap && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-6">
             <Snap label="Outstanding" value={`₹${snap.outstandingTotal.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} sub={`${snap.pendingCustomers} customers`} color="red" />
             <Snap label="Today" value={`₹${snap.todayCollected.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} sub={`${snap.todayBills} bills paid`} color="emerald" />
             <Snap label="This Month" value={`₹${snap.thisMonthCollected.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`} sub={`${snap.thisMonthBills} bills paid`} color="cyan" />
@@ -86,7 +86,7 @@ export default function ReportsHubPage() {
         )}
 
         {/* Reports list */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <ReportCard
             href="/dashboard/whatsapp"
             icon={<MessageCircle className="w-6 h-6" />}
@@ -186,10 +186,10 @@ function Snap({ label, value, sub, color }: { label: string; value: string; sub:
     indigo:  'bg-indigo-50 border-indigo-200 text-indigo-700',
   };
   return (
-    <div className={`rounded-xl border p-4 ${map[color]}`}>
-      <div className="text-xs font-medium opacity-70">{label}</div>
-      <div className="text-2xl font-display font-bold mt-1">{value}</div>
-      <div className="text-xs opacity-70 mt-1">{sub}</div>
+    <div className={`rounded-xl border p-3 sm:p-4 ${map[color]}`}>
+      <div className="text-[11px] sm:text-xs font-medium opacity-70 leading-tight">{label}</div>
+      <div className="text-xl sm:text-2xl font-display font-bold mt-1 break-words">{value}</div>
+      <div className="text-[10px] sm:text-xs opacity-70 mt-1 leading-tight">{sub}</div>
     </div>
   );
 }
@@ -213,14 +213,14 @@ function ReportCard({ href, icon, title, desc, color }: {
   return (
     <Link
       href={href}
-      className="group bg-white rounded-xl border border-gray-100 hover:border-emerald-300 hover:shadow-md transition-all p-5"
+      className="group bg-white rounded-xl border border-gray-100 hover:border-emerald-300 hover:shadow-md transition-all p-4 sm:p-5"
     >
       <div className="flex items-start justify-between mb-3">
-        <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${map[color]}`}>{icon}</div>
+        <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center ${map[color]}`}>{icon}</div>
         <ArrowRight className="w-5 h-5 text-gray-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
       </div>
-      <h3 className="font-display font-semibold text-gray-900 mb-1">{title}</h3>
-      <p className="text-sm text-gray-500">{desc}</p>
+      <h3 className="font-display font-semibold text-gray-900 mb-1 leading-snug">{title}</h3>
+      <p className="text-sm text-gray-500 leading-snug">{desc}</p>
     </Link>
   );
 }

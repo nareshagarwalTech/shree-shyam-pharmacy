@@ -62,35 +62,35 @@ export default function StatsCards({ stats, onFilterClick, activeFilter }: Stats
   ];
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
       {cards.map((card) => {
         const Icon = card.icon;
         const isActive = activeFilter === card.key;
-        
+
         return (
           <button
             key={card.key}
             onClick={() => onFilterClick(card.key as any)}
             className={`
-              relative overflow-hidden rounded-xl border p-4 text-left transition-all
+              relative overflow-hidden rounded-xl border p-3 sm:p-4 text-left transition-all
               ${card.bgColor} ${card.borderColor} ${card.hoverBg}
               ${isActive ? 'ring-2 ring-primary-500 ring-offset-2' : ''}
             `}
           >
-            <div className="flex items-start justify-between">
-              <div>
-                <p className={`text-sm font-medium ${card.textColor} opacity-80`}>
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs sm:text-sm font-medium ${card.textColor} opacity-80 leading-tight`}>
                   {card.label}
                 </p>
-                <p className={`text-3xl font-display font-bold mt-1 ${card.textColor}`}>
+                <p className={`text-2xl sm:text-3xl font-display font-bold mt-1 ${card.textColor}`}>
                   {card.value}
                 </p>
               </div>
-              <div className={`p-2 rounded-lg bg-gradient-to-br ${card.color} shadow-sm`}>
-                <Icon className="w-5 h-5 text-white" />
+              <div className={`p-1.5 sm:p-2 rounded-lg bg-gradient-to-br ${card.color} shadow-sm shrink-0`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
               </div>
             </div>
-            
+
             {/* Active indicator */}
             {isActive && (
               <div className="absolute bottom-0 left-0 right-0 h-1 bg-primary-500"></div>

@@ -96,11 +96,11 @@ export default function DailyCollectionPage() {
               Money received per day. Includes payments for old credit and same-day cash on delivery.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <select
               value={range}
               onChange={(e) => setRange(e.target.value as RangeKey)}
-              className="px-3 py-2.5 rounded-lg border border-gray-200 bg-white text-sm font-medium"
+              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium flex-1 sm:flex-initial"
             >
               {Object.entries(RANGES).map(([k, v]) => (
                 <option key={k} value={k}>{v.label}</option>
@@ -108,13 +108,14 @@ export default function DailyCollectionPage() {
             </select>
             <button
               onClick={() => { setRefreshing(true); fetch(); }}
-              className="p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50"
+              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+              aria-label="Refresh"
             >
               <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={exportCsv}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
             >
               <Download className="w-4 h-4" /> CSV
             </button>
@@ -150,10 +151,12 @@ export default function DailyCollectionPage() {
 
         {/* Same-day vs Old-due breakdown */}
         {totals.total > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 mb-6">
+            <div className="flex items-start justify-between mb-2 gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-gray-700">How were collections earned?</h3>
-              <span className="text-xs text-gray-500">avg ₹{avgPerDay.toLocaleString('en-IN', { maximumFractionDigits: 0 })} per day</span>
+              <span className="text-xs text-gray-500 whitespace-nowrap">
+                avg ₹{avgPerDay.toLocaleString('en-IN', { maximumFractionDigits: 0 })} / day
+              </span>
             </div>
             <div className="flex h-8 rounded-lg overflow-hidden">
               {totals.sameDay > 0 && (
@@ -175,14 +178,14 @@ export default function DailyCollectionPage() {
                 </div>
               )}
             </div>
-            <div className="flex items-center justify-between text-xs text-gray-600 mt-2">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-xs text-gray-600 mt-2">
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                Same-day cash-on-delivery: <strong className="text-emerald-700">₹{totals.sameDay.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                <span>Same-day cash: <strong className="text-emerald-700">₹{totals.sameDay.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-amber-500" />
-                Old-due collected: <strong className="text-amber-700">₹{totals.oldDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
+                <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                <span>Old-due collected: <strong className="text-amber-700">₹{totals.oldDue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong></span>
               </span>
             </div>
           </div>
@@ -190,8 +193,8 @@ export default function DailyCollectionPage() {
 
         {/* Chart */}
         {chartData.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-            <div className="flex items-center justify-between mb-3">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 mb-6">
+            <div className="flex items-start justify-between mb-3 gap-2 flex-wrap">
               <h3 className="text-sm font-semibold text-gray-700">
                 Daily Collection (₹) — last {chartData.length} days
               </h3>
@@ -200,12 +203,23 @@ export default function DailyCollectionPage() {
                 <Legend color="bg-cyan-500" label="Online" />
               </div>
             </div>
-            <div className="flex items-end gap-1 h-48">
-              {chartData.map((r) => {
+            <div className="flex items-end gap-0.5 sm:gap-1 h-44 sm:h-48">
+              {chartData.map((r, i) => {
                 const cash = Number(r.cash_received);
                 const online = Number(r.online_received);
                 const total = cash + online;
                 const h = (total / maxValue) * 100;
+                const dt = new Date(r.date);
+                // Show month abbreviation on first bar of the chart and on the
+                // 1st of each month; otherwise just the day number, and only
+                // every Nth bar so labels never overlap.
+                const isFirst = i === 0;
+                const isMonthStart = dt.getDate() === 1;
+                const labelStride = chartData.length > 60 ? 7 : chartData.length > 30 ? 5 : chartData.length > 14 ? 3 : 1;
+                const showXLabel = isFirst || isMonthStart || i === chartData.length - 1 || i % labelStride === 0;
+                const labelText = isFirst || isMonthStart
+                  ? dt.toLocaleString('en-US', { month: 'short' }) + ' ' + dt.getDate()
+                  : String(dt.getDate());
                 return (
                   <div
                     key={r.date}
@@ -216,8 +230,8 @@ export default function DailyCollectionPage() {
                       {cash > 0 && <div className="bg-emerald-500" style={{ height: `${(cash / total) * 100}%` }} />}
                       {online > 0 && <div className="bg-cyan-500" style={{ height: `${(online / total) * 100}%` }} />}
                     </div>
-                    <div className="text-[9px] text-gray-400 mt-1 truncate w-full text-center">
-                      {new Date(r.date).getDate()}
+                    <div className="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate w-full text-center leading-tight">
+                      {showXLabel ? labelText : ''}
                     </div>
                   </div>
                 );
@@ -277,8 +291,12 @@ export default function DailyCollectionPage() {
                 <div className="text-2xl font-display font-bold text-gray-900">
                   ₹{totals.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                 </div>
-                <div className="text-xs text-gray-600 mt-1">
-                  Cash ₹{totals.cash.toLocaleString('en-IN')} · Online ₹{totals.online.toLocaleString('en-IN')} · {totals.bills} payments
+                <div className="text-xs text-gray-600 mt-1 flex flex-wrap gap-x-2 gap-y-0.5">
+                  <span>Cash ₹{totals.cash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>Online ₹{totals.online.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                  <span className="text-gray-300">·</span>
+                  <span>{totals.bills} payments</span>
                 </div>
               </div>
             </div>

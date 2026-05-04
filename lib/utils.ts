@@ -10,10 +10,37 @@ export function formatDate(date: Date | string, formatStr: string = DATE_FORMAT)
 }
 
 /**
- * Format date short (for mobile)
+ * Format date short (for mobile) — month as text to avoid dd/mm vs mm/dd confusion
  */
 export function formatDateShort(date: Date | string): string {
   return formatDate(date, DATE_FORMAT_SHORT);
+}
+
+/**
+ * Convert "YYYY-MM" (used in monthly_collection.month_label) into a readable
+ * month name like "Apr 2026". Always uses month-as-text to avoid the dd/mm
+ * vs mm/dd ambiguity between Indian and US numeric formats.
+ */
+export function formatMonthLabel(yyyymm: string): string {
+  if (!yyyymm) return '';
+  const [yearStr, monthStr] = yyyymm.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  if (!year || !month || month < 1 || month > 12) return yyyymm;
+  // parse to a real date so date-fns handles locale + format consistently
+  return format(new Date(year, month - 1, 1), 'MMM yyyy'); // -> "Apr 2026"
+}
+
+/**
+ * Compact month for narrow chart axes — "Apr '26".
+ */
+export function formatMonthShort(yyyymm: string): string {
+  if (!yyyymm) return '';
+  const [yearStr, monthStr] = yyyymm.split('-');
+  const year = parseInt(yearStr, 10);
+  const month = parseInt(monthStr, 10);
+  if (!year || !month || month < 1 || month > 12) return yyyymm;
+  return format(new Date(year, month - 1, 1), "MMM ''yy"); // -> "Apr '26"
 }
 
 /**

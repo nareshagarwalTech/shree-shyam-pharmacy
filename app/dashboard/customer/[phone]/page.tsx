@@ -12,7 +12,7 @@ import {
   PaymentChannel,
 } from '@/lib/supabase';
 import { formatPhoneDisplay, generateDueMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
-import { formatDate } from '@/lib/utils';
+import { formatDate, formatMonthLabel, formatMonthShort } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
 import Toast from '@/components/Toast';
 import EditCustomerModal from '@/components/EditCustomerModal';
@@ -363,30 +363,36 @@ export default function CustomerStatementPage() {
             </div>
 
             {monthly.length > 0 && (
-              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-4">
-                <h3 className="text-sm font-semibold text-gray-700 mb-3">Monthly Billed vs Paid</h3>
-                <div className="flex items-end gap-3 h-40">
-                  {monthly.map((m) => {
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 sm:p-4 mb-4">
+                <div className="flex items-start justify-between gap-2 mb-3 flex-wrap">
+                  <h3 className="text-sm font-semibold text-gray-700">Monthly Billed vs Paid</h3>
+                  <div className="flex items-center gap-3 text-xs text-gray-600">
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /> Billed</span>
+                    <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500" /> Paid</span>
+                  </div>
+                </div>
+                <div className="flex items-end gap-1 sm:gap-3 h-36 sm:h-40">
+                  {monthly.map((m, i) => {
                     const billedH = (m.billed / monthlyMax) * 100;
                     const paidH = (m.paid / monthlyMax) * 100;
+                    const labelStride = monthly.length > 12 ? 2 : 1;
+                    const showXLabel = i % labelStride === 0 || i === monthly.length - 1;
                     return (
                       <div
                         key={m.month}
                         className="flex-1 flex flex-col items-center min-w-0 group"
-                        title={`${m.month}\nBilled: ₹${m.billed.toLocaleString('en-IN')}\nPaid: ₹${m.paid.toLocaleString('en-IN')}`}
+                        title={`${formatMonthLabel(m.month)}\nBilled: ₹${m.billed.toLocaleString('en-IN')}\nPaid: ₹${m.paid.toLocaleString('en-IN')}`}
                       >
-                        <div className="w-full flex items-end justify-center gap-1 flex-1">
+                        <div className="w-full flex items-end justify-center gap-0.5 sm:gap-1 flex-1">
                           <div className="bg-blue-400 w-1/2 rounded-t" style={{ height: `${billedH}%`, minHeight: m.billed > 0 ? 2 : 0 }} />
                           <div className="bg-emerald-500 w-1/2 rounded-t" style={{ height: `${paidH}%`, minHeight: m.paid > 0 ? 2 : 0 }} />
                         </div>
-                        <div className="text-[10px] text-gray-500 mt-1 truncate w-full text-center">{m.month.slice(2)}</div>
+                        <div className="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate w-full text-center leading-tight">
+                          {showXLabel ? formatMonthShort(m.month) : ''}
+                        </div>
                       </div>
                     );
                   })}
-                </div>
-                <div className="flex items-center gap-3 mt-2 text-xs text-gray-600">
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /> Billed</span>
-                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500" /> Paid</span>
                 </div>
               </div>
             )}

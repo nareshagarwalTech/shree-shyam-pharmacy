@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, MonthlyCollection } from '@/lib/supabase';
+import { formatMonthLabel, formatMonthShort } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
 import Toast from '@/components/Toast';
 import { CalendarRange, Download, RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
@@ -75,16 +76,17 @@ export default function MonthlyCollectionPage() {
             </h1>
             <p className="text-sm text-gray-500">Month-over-month collection. Last 36 months.</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => { setRefreshing(true); fetch(); }}
-              className="p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50"
+              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+              aria-label="Refresh"
             >
               <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
             <button
               onClick={exportCsv}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
             >
               <Download className="w-4 h-4" /> CSV
             </button>
@@ -108,7 +110,7 @@ export default function MonthlyCollectionPage() {
             <Tile
               label="Avg per Bill"
               value={`₹${Number(rows[0].avg_per_bill || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-              sub={rows[0].month_label}
+              sub={formatMonthLabel(rows[0].month_label)}
               color="amber"
             />
             <Tile
@@ -121,34 +123,49 @@ export default function MonthlyCollectionPage() {
         )}
 
         {chartData.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">
-              Total Collected (₹) — last {chartData.length} months
-            </h3>
-            <div className="flex items-end gap-2 h-56">
-              {chartData.map((r) => {
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 mb-6">
+            <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Total Collected (₹) — last {chartData.length} months
+              </h3>
+              <div className="flex items-center gap-3 text-xs">
+                <Legend color="bg-emerald-500" label="Cash" />
+                <Legend color="bg-cyan-500" label="Online" />
+              </div>
+            </div>
+            <div className="flex items-end gap-1 sm:gap-2 h-48 sm:h-56">
+              {chartData.map((r, i) => {
                 const cash = Number(r.cash_received);
                 const online = Number(r.online_received);
                 const total = cash + online;
                 const h = (total / maxValue) * 100;
+                // Thin out top labels: show only first/last/highest few to avoid clutter
+                const showTopLabel = total > 0 && (
+                  i === chartData.length - 1 ||
+                  total === maxValue ||
+                  (chartData.length <= 12 && total > 0)
+                );
+                // X-axis: show every Nth label depending on density
+                const labelStride = chartData.length > 24 ? 3 : chartData.length > 12 ? 2 : 1;
+                const showXLabel = i % labelStride === 0 || i === chartData.length - 1;
                 return (
                   <div
                     key={r.month_label}
                     className="flex-1 flex flex-col items-center min-w-0 group"
-                    title={`${r.month_label}\nCash ₹${cash.toLocaleString('en-IN')}\nOnline ₹${online.toLocaleString('en-IN')}\nTotal ₹${total.toLocaleString('en-IN')}\n${r.payment_count} bills`}
+                    title={`${formatMonthLabel(r.month_label)}\nCash ₹${cash.toLocaleString('en-IN')}\nOnline ₹${online.toLocaleString('en-IN')}\nTotal ₹${total.toLocaleString('en-IN')}\n${r.payment_count} bills`}
                   >
-                    <div className="text-[10px] text-gray-500 mb-1">
-                      {total > 0 ? `₹${(total / 1000).toFixed(0)}k` : ''}
+                    <div className="text-[9px] sm:text-[10px] text-gray-500 mb-1 h-3 truncate w-full text-center">
+                      {showTopLabel && total >= 1000 ? `${(total / 1000).toFixed(total >= 100000 ? 0 : 0)}k` : ''}
                     </div>
                     <div
-                      className="w-full flex flex-col-reverse rounded-t overflow-hidden group-hover:opacity-80"
+                      className="w-full flex flex-col-reverse rounded-t overflow-hidden group-hover:opacity-80 transition-opacity"
                       style={{ height: `${h}%`, minHeight: total > 0 ? 4 : 0 }}
                     >
                       {cash > 0 && <div className="bg-emerald-500" style={{ height: `${(cash / total) * 100}%` }} />}
                       {online > 0 && <div className="bg-cyan-500" style={{ height: `${(online / total) * 100}%` }} />}
                     </div>
-                    <div className="text-[10px] text-gray-500 mt-1 truncate w-full text-center">
-                      {r.month_label.slice(2)}
+                    <div className="text-[9px] sm:text-[10px] text-gray-500 mt-1 truncate w-full text-center leading-tight">
+                      {showXLabel ? formatMonthShort(r.month_label) : ''}
                     </div>
                   </div>
                 );
@@ -175,7 +192,7 @@ export default function MonthlyCollectionPage() {
                 return (
                   <div key={r.month_label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="font-semibold text-gray-900">{r.month_label}</div>
+                      <div className="font-semibold text-gray-900">{formatMonthLabel(r.month_label)}</div>
                       <div className="text-base font-display font-bold text-gray-900">
                         ₹{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </div>
@@ -217,7 +234,7 @@ export default function MonthlyCollectionPage() {
                 <tbody className="divide-y divide-gray-100">
                   {rows.map((r) => (
                     <tr key={r.month_label} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.month_label}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900 whitespace-nowrap">{formatMonthLabel(r.month_label)}</td>
                       <td className="px-4 py-3 text-right text-sm">{r.payment_count}</td>
                       <td className="px-4 py-3 text-right text-sm text-gray-600">{r.unique_customers}</td>
                       <td className="px-4 py-3 text-right text-sm text-emerald-700">₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
@@ -270,4 +287,13 @@ function Trend({ val }: { val: number }) {
 
 function Th({ children, align = 'left' }: { children: React.ReactNode; align?: 'left' | 'right' }) {
   return <th className={`px-4 py-3 text-${align} text-xs font-semibold text-gray-600 uppercase tracking-wider`}>{children}</th>;
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-gray-600">
+      <span className={`w-3 h-3 rounded-sm ${color}`} />
+      {label}
+    </span>
+  );
 }
