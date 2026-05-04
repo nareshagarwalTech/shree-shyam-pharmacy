@@ -22,6 +22,7 @@ import {
   CheckCircle,
   RefreshCw,
   Eye,
+  Phone,
 } from 'lucide-react';
 
 interface RecipientRow extends Customer {
@@ -402,7 +403,14 @@ export default function BroadcastPage() {
                             )}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {formatPhoneDisplay(c.phone)}
+                            <a
+                              href={`tel:${c.phone}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 hover:text-purple-600"
+                            >
+                              <Phone className="w-3 h-3" />
+                              {formatPhoneDisplay(c.phone)}
+                            </a>
                             {c.preferred_language !== 'en' && (
                               <span className="ml-2 px-1 py-0.5 text-[9px] bg-blue-100 text-blue-700 rounded uppercase">{c.preferred_language}</span>
                             )}

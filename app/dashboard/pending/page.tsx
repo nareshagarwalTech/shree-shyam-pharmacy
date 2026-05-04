@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase, CustomerBalance } from '@/lib/supabase';
-import { formatPhoneDisplay, generateDueMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
+import { generateDueMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
 import { formatDate } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
 import {
   Search,
@@ -15,6 +16,7 @@ import {
   Download,
   RefreshCw,
   Send,
+  Phone,
 } from 'lucide-react';
 
 export default function PendingPage() {
@@ -244,8 +246,8 @@ export default function PendingPage() {
                           ₹{Number(r.outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                         </div>
                       </div>
-                      <div className="text-xs text-gray-500 flex items-center gap-2 mb-2">
-                        <span>{formatPhoneDisplay(r.phone)}</span>
+                      <div className="text-xs text-gray-500 flex items-center gap-2 mb-2 flex-wrap">
+                        <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-gray-500 hover:text-purple-600" />
                         <span className="text-gray-300">·</span>
                         <span>{r.bill_count} bill{r.bill_count === 1 ? '' : 's'}</span>
                         {r.whatsapp_opt_out && (
@@ -261,6 +263,13 @@ export default function PendingPage() {
                           <MessageCircle className="w-3.5 h-3.5" />
                           WhatsApp
                         </button>
+                        <a
+                          href={`tel:${r.phone}`}
+                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 hover:bg-purple-100"
+                        >
+                          <Phone className="w-3.5 h-3.5" />
+                          Call
+                        </a>
                         <button
                           onClick={() => markPaid(r, 'cash')}
                           disabled={markingPaid === r.customer_id}
@@ -321,7 +330,9 @@ export default function PendingPage() {
                           <div className="text-[10px] text-slate-500 uppercase">opted out</div>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatPhoneDisplay(r.phone)}</td>
+                      <td className="px-4 py-3 text-sm text-gray-600">
+                        <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-gray-600 hover:text-purple-600" />
+                      </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-700">
                         ₹{Number(r.total_billed).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </td>
@@ -345,6 +356,13 @@ export default function PendingPage() {
                           >
                             <MessageCircle className="w-4 h-4" />
                           </button>
+                          <a
+                            href={`tel:${r.phone}`}
+                            className="p-2 rounded-lg text-purple-600 hover:bg-purple-50"
+                            title="Call customer"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </a>
                           <button
                             onClick={() => markPaid(r, 'cash')}
                             disabled={markingPaid === r.customer_id}

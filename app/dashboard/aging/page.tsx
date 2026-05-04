@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase, CustomerAging } from '@/lib/supabase';
-import { formatPhoneDisplay, generateDueMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
+import { generateDueMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
 import { formatDate } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
-import { Search, Hourglass, MessageCircle, Download, RefreshCw, AlertTriangle } from 'lucide-react';
+import { Search, Hourglass, MessageCircle, Download, RefreshCw, AlertTriangle, Phone } from 'lucide-react';
 
 export default function AgingPage() {
   const [rows, setRows] = useState<CustomerAging[]>([]);
@@ -196,7 +197,7 @@ export default function AgingPage() {
                         >
                           {r.customer_name}
                         </Link>
-                        <div className="text-xs text-gray-500 mt-0.5">{formatPhoneDisplay(r.phone)}</div>
+                        <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 mt-0.5" />
                       </div>
                       <div className="text-right shrink-0">
                         <div className="text-lg font-display font-bold text-red-600">
@@ -213,6 +214,13 @@ export default function AgingPage() {
                       ))}
                     </div>
                     <div className="flex items-center justify-end gap-1.5">
+                      <a
+                        href={`tel:${r.phone}`}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        Call
+                      </a>
                       <button
                         onClick={() => sendDueReminder(r)}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
@@ -253,7 +261,7 @@ export default function AgingPage() {
                         >
                           {r.customer_name}
                         </Link>
-                        <div className="text-xs text-gray-500">{formatPhoneDisplay(r.phone)}</div>
+                        <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600" />
                       </td>
                       <td className="px-4 py-2.5 text-right font-semibold text-red-600">
                         ₹{Number(r.outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
@@ -268,13 +276,22 @@ export default function AgingPage() {
                       <td className="px-4 py-2.5 text-right text-red-700">{cell(r.bucket_90_plus)}</td>
                       <td className="px-4 py-2.5 text-right text-gray-600">{r.unpaid_bill_count}</td>
                       <td className="px-3 py-2.5 text-right">
-                        <button
-                          onClick={() => sendDueReminder(r)}
-                          className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50"
-                          title="Send WhatsApp reminder"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={`tel:${r.phone}`}
+                            className="p-2 rounded-lg text-purple-600 hover:bg-purple-50"
+                            title="Call customer"
+                          >
+                            <Phone className="w-4 h-4" />
+                          </a>
+                          <button
+                            onClick={() => sendDueReminder(r)}
+                            className="p-2 rounded-lg text-emerald-600 hover:bg-emerald-50"
+                            title="Send WhatsApp reminder"
+                          >
+                            <MessageCircle className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -3,9 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase, TopCustomer } from '@/lib/supabase';
-import { formatPhoneDisplay } from '@/lib/whatsapp';
 import { formatDate } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
 import { Trophy, Search, Download, RefreshCw, Receipt } from 'lucide-react';
 
@@ -182,8 +182,12 @@ export default function TopCustomersPage() {
                         ₹{Number(r.total_billed).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </div>
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      {formatPhoneDisplay(r.phone)} · {r.bill_count} bill{r.bill_count === 1 ? '' : 's'} · last {r.last_delivery_date ? formatDate(r.last_delivery_date) : '—'}
+                    <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5 flex-wrap">
+                      <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-gray-500 hover:text-purple-600" />
+                      <span className="text-gray-300">·</span>
+                      <span>{r.bill_count} bill{r.bill_count === 1 ? '' : 's'}</span>
+                      <span className="text-gray-300">·</span>
+                      <span>last {r.last_delivery_date ? formatDate(r.last_delivery_date) : '—'}</span>
                     </div>
                     <div className="flex items-center gap-3 text-xs mt-1.5">
                       <span className="text-emerald-700">
@@ -225,7 +229,7 @@ export default function TopCustomersPage() {
                       >
                         {r.customer_name}
                       </Link>
-                      <div className="text-xs text-gray-500">{formatPhoneDisplay(r.phone)}</div>
+                      <PhoneLink phone={r.phone} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600" />
                     </td>
                     <td className="px-4 py-3 text-right">{r.bill_count}</td>
                     <td className="px-4 py-3 text-right font-semibold">

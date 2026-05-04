@@ -271,8 +271,14 @@ export default function CustomerStatementPage() {
                     </button>
                   </div>
                   <div className="flex flex-wrap items-center gap-3 mt-1 text-sm text-gray-600">
-                    <span className="flex items-center gap-1"><Phone className="w-4 h-4" /> {formatPhoneDisplay(customer.phone)}</span>
-                    {customer.alternate_phone && <span className="text-gray-400">alt: {formatPhoneDisplay(customer.alternate_phone)}</span>}
+                    <a href={`tel:${customer.phone}`} className="flex items-center gap-1 hover:text-purple-600">
+                      <Phone className="w-4 h-4" /> {formatPhoneDisplay(customer.phone)}
+                    </a>
+                    {customer.alternate_phone && (
+                      <a href={`tel:${customer.alternate_phone}`} className="text-gray-400 hover:text-purple-600 flex items-center gap-1">
+                        alt: {formatPhoneDisplay(customer.alternate_phone)}
+                      </a>
+                    )}
                     {customer.address && <span className="flex items-center gap-1"><MapPin className="w-4 h-4" /> {customer.address}</span>}
                     {customer.preferred_language !== 'en' && (
                       <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded uppercase">{customer.preferred_language}</span>
@@ -298,6 +304,14 @@ export default function CustomerStatementPage() {
                     <Plus className="w-4 h-4" />
                     <span className="hidden sm:inline">+ Bill</span>
                   </Link>
+                  <a
+                    href={`tel:${customer.phone}`}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-500 hover:bg-purple-600 text-white font-medium rounded-md text-sm"
+                    title="Call customer"
+                  >
+                    <Phone className="w-4 h-4" />
+                    <span className="hidden sm:inline">Call</span>
+                  </a>
                   {Number(balance.outstanding) > 0 && (
                     <button
                       onClick={sendDueReminder}

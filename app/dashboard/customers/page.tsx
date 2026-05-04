@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase, CustomerWithGroups, Group } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { formatPhoneDisplay } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
 import AddCustomerModal from '@/components/AddCustomerModal';
 import {
@@ -124,19 +124,38 @@ export default function CustomersPage() {
       <DashboardHeader />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl font-display font-bold text-gray-900">All Customers</h1>
-            <p className="text-sm text-gray-500">
-              {customers.length} total · click a row to manage groups, opt-out, or pause reminders
-            </p>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-display font-bold text-gray-900">All Customers</h1>
+              <p className="text-sm text-gray-500">
+                {customers.length} total · tap a row to manage groups, opt-out, or pause reminders
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAdd(true)}
+              className="shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add
+            </button>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search name or phone…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              />
+            </div>
             <select
               value={groupFilter}
               onChange={(e) => setGroupFilter(e.target.value)}
-              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm"
+              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm sm:w-44"
             >
               <option value="all">All Groups</option>
               {groups.map((g) => (
@@ -145,25 +164,6 @@ export default function CustomersPage() {
                 </option>
               ))}
             </select>
-
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search…"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 w-56"
-              />
-            </div>
-
-            <button
-              onClick={() => setShowAdd(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg"
-            >
-              <Plus className="w-4 h-4" />
-              Add
-            </button>
           </div>
         </div>
 
@@ -188,16 +188,16 @@ export default function CustomersPage() {
                     className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50"
                     onClick={() => setExpanded(expanded === c.id ? null : c.id)}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
                       <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
                         <span className="text-emerald-700 font-semibold">
                           {c.name.charAt(0).toUpperCase()}
                         </span>
                       </div>
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <h3 className="font-semibold text-gray-900 truncate">{c.name}</h3>
-                        <p className="text-sm text-gray-500 flex items-center gap-2">
-                          <span>{formatPhoneDisplay(c.phone)}</span>
+                        <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
+                          <PhoneLink phone={c.phone} className="inline-flex items-center gap-1 text-gray-500 hover:text-purple-600" />
                           {c.whatsapp_opt_out && (
                             <span className="inline-flex px-1.5 py-0.5 text-[10px] bg-slate-100 text-slate-600 rounded">
                               Opted out
@@ -207,6 +207,16 @@ export default function CustomersPage() {
                             <span className="inline-flex px-1.5 py-0.5 text-[10px] bg-gray-100 text-gray-600 rounded">
                               Paused
                             </span>
+                          )}
+                        </p>
+                        {/* Mobile-only inline summary */}
+                        <p className="md:hidden text-xs text-gray-500 mt-0.5">
+                          {c.total_sales} sale{c.total_sales === 1 ? '' : 's'}
+                          {c.total_spent != null && (
+                            <> · ₹{Math.round(c.total_spent).toLocaleString('en-IN')}</>
+                          )}
+                          {c.last_purchase_date && (
+                            <> · {formatDate(c.last_purchase_date)}</>
                           )}
                         </p>
                       </div>

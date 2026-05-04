@@ -255,16 +255,16 @@ export default function WhatsAppCenterPage() {
         </div>
 
         {/* Stat tiles */}
-        <div className="grid grid-cols-3 gap-3 mb-6">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
           <Tile label="Need reminder" value={String(stats.total)} color="indigo" />
           <Tile label="Sent today" value={String(stats.sent)} color="emerald" sub={stats.sent > 0 ? `${Math.round((stats.sent / stats.total) * 100)}% done` : undefined} />
           <Tile label="Remaining" value={String(stats.remaining)} color="amber" />
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
-            <div className="relative flex-1 max-w-md">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 mb-6">
+          <div className="flex flex-col gap-3">
+            <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
                 type="text"
@@ -276,17 +276,17 @@ export default function WhatsAppCenterPage() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex bg-gray-100 rounded-lg p-1">
+              <div className="flex bg-gray-100 rounded-lg p-1 w-full sm:w-auto overflow-x-auto">
                 {([
                   { k: 'all',     label: 'All' },
                   { k: 'due',     label: 'Outstanding' },
-                  { k: 'refill',  label: 'Refill due' },
+                  { k: 'refill',  label: 'Refill' },
                   { k: 'overdue', label: 'Overdue' },
                 ] as const).map((opt) => (
                   <button
                     key={opt.k}
                     onClick={() => setFilter(opt.k)}
-                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    className={`flex-1 sm:flex-initial px-2.5 sm:px-3 py-1.5 rounded-md text-xs sm:text-sm font-medium transition-all whitespace-nowrap ${
                       filter === opt.k ? 'bg-white shadow-sm text-emerald-600' : 'text-gray-500 hover:text-gray-700'
                     }`}
                   >
@@ -302,12 +302,12 @@ export default function WhatsAppCenterPage() {
                 title={hideSent ? 'Showing only remaining' : 'Showing everyone'}
               >
                 {hideSent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                {hideSent ? 'Hide sent' : 'Show all'}
+                <span className="hidden sm:inline">{hideSent ? 'Hide sent' : 'Show all'}</span>
               </button>
               {filtered.filter((r) => !r.sentToday).length > 1 && (
                 <button
                   onClick={openAllRemaining}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-emerald-500 hover:bg-emerald-600 text-white ml-auto"
                 >
                   <Send className="w-4 h-4" />
                   Open all ({filtered.filter((r) => !r.sentToday).length})
@@ -350,20 +350,20 @@ export default function WhatsAppCenterPage() {
               return (
                 <div
                   key={r.customer.customer_id}
-                  className={`bg-white rounded-xl border p-4 transition-all ${
+                  className={`bg-white rounded-xl border p-3 sm:p-4 transition-all ${
                     sent ? 'border-emerald-200 bg-emerald-50/30' : 'border-gray-100 hover:border-gray-200'
                   }`}
                 >
-                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                  {/* Identity */}
+                  <div className="flex items-start justify-between gap-2 mb-2 sm:mb-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <Link
                           href={`/dashboard/customer/${r.customer.phone}`}
-                          className="font-display font-semibold text-gray-900 hover:text-emerald-600"
+                          className="font-display font-semibold text-gray-900 hover:text-emerald-600 break-words"
                         >
                           {r.customer.customer_name}
                         </Link>
-                        <span className="text-xs text-gray-500">{formatPhoneDisplay(r.customer.phone)}</span>
                         {r.customer.preferred_language !== 'en' && (
                           <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-blue-100 text-blue-700 rounded uppercase">
                             {r.customer.preferred_language}
@@ -375,10 +375,17 @@ export default function WhatsAppCenterPage() {
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600 mt-0.5 flex items-center gap-2 flex-wrap">
+                      <a
+                        href={`tel:${r.customer.phone}`}
+                        className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 mt-0.5"
+                      >
+                        <Phone className="w-3 h-3" />
+                        {formatPhoneDisplay(r.customer.phone)}
+                      </a>
+                      <div className="text-sm mt-1 flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-amber-700">{r.reasonLabel}</span>
                         {r.customer.last_purchase_date && (
-                          <span className="text-gray-400">
+                          <span className="text-xs text-gray-400">
                             · last bill {formatDate(r.customer.last_purchase_date)}
                           </span>
                         )}
@@ -389,61 +396,62 @@ export default function WhatsAppCenterPage() {
                         </div>
                       )}
                     </div>
+                    {sent && (
+                      <span className="inline-flex shrink-0 items-center gap-1 px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-md">
+                        <CheckCircle className="w-3.5 h-3.5" />
+                        Sent {lastSentLabel}
+                      </span>
+                    )}
+                  </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                  {/* Actions */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowPreview(showPreview === r.customer.customer_id ? null : r.customer.customer_id)}
+                      className={`text-xs underline flex items-center gap-1 mr-auto ${
+                        isEdited(r) ? 'text-amber-600 font-medium' : 'text-gray-500 hover:text-gray-700'
+                      }`}
+                    >
+                      {isEdited(r) && <Pencil className="w-3 h-3" />}
+                      {showPreview === r.customer.customer_id ? 'Hide' : isEdited(r) ? 'Edited' : 'Preview / Edit'} message
+                    </button>
+                    {sent ? (
                       <button
-                        onClick={() => setShowPreview(showPreview === r.customer.customer_id ? null : r.customer.customer_id)}
-                        className={`text-xs underline flex items-center gap-1 ${
-                          isEdited(r) ? 'text-amber-600 font-medium' : 'text-gray-500 hover:text-gray-700'
-                        }`}
+                        onClick={() => undoMarkSent(r)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-md border border-gray-200"
+                        title="Undo mark sent"
                       >
-                        {isEdited(r) && <Pencil className="w-3 h-3" />}
-                        {showPreview === r.customer.customer_id ? 'Hide' : isEdited(r) ? 'Edited' : 'Preview / Edit'} message
+                        <Undo2 className="w-3.5 h-3.5" />
+                        Undo
                       </button>
-                      {sent ? (
-                        <>
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-md">
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Sent {lastSentLabel}</span>
-                            <span className="sm:hidden">Sent</span>
-                          </span>
-                          <button
-                            onClick={() => undoMarkSent(r)}
-                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
-                            title="Undo mark sent"
-                          >
-                            <Undo2 className="w-3.5 h-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            onClick={() => openWA(r)}
-                            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-md text-sm"
-                            title="Open WhatsApp with the message"
-                          >
-                            <MessageCircle className="w-4 h-4" />
-                            <span className="hidden sm:inline">Open</span>
-                          </button>
-                          <button
-                            onClick={() => markSent(r)}
-                            disabled={r.customer.whatsapp_opt_out}
-                            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent font-medium rounded-md text-sm"
-                            title="Mark reminder as sent"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            <span className="hidden sm:inline">Sent</span>
-                          </button>
-                          <a
-                            href={`tel:${r.customer.phone}`}
-                            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md"
-                            title="Call customer"
-                          >
-                            <Phone className="w-4 h-4" />
-                          </a>
-                        </>
-                      )}
-                    </div>
+                    ) : (
+                      <>
+                        <a
+                          href={`tel:${r.customer.phone}`}
+                          className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md border border-gray-200"
+                          title="Call customer"
+                        >
+                          <Phone className="w-4 h-4" />
+                        </a>
+                        <button
+                          onClick={() => markSent(r)}
+                          disabled={r.customer.whatsapp_opt_out}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent font-medium rounded-md text-sm"
+                          title="Mark reminder as sent"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          Mark sent
+                        </button>
+                        <button
+                          onClick={() => openWA(r)}
+                          className="flex items-center justify-center gap-1.5 px-3 py-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-md text-sm"
+                          title="Open WhatsApp with the message"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          Open WhatsApp
+                        </button>
+                      </>
+                    )}
                   </div>
 
                   {showPreview === r.customer.customer_id && (
@@ -520,10 +528,10 @@ function Tile({ label, value, sub, color }: {
     amber:   'bg-amber-50 border-amber-200 text-amber-700',
   };
   return (
-    <div className={`rounded-xl border p-4 ${map[color]}`}>
-      <div className="text-xs font-medium opacity-70">{label}</div>
-      <div className="text-3xl font-display font-bold mt-1">{value}</div>
-      {sub && <div className="text-xs opacity-70 mt-1">{sub}</div>}
+    <div className={`rounded-xl border p-3 sm:p-4 ${map[color]}`}>
+      <div className="text-[11px] sm:text-xs font-medium opacity-70 leading-tight">{label}</div>
+      <div className="text-2xl sm:text-3xl font-display font-bold mt-1">{value}</div>
+      {sub && <div className="text-[10px] sm:text-xs opacity-70 mt-1 leading-tight">{sub}</div>}
     </div>
   );
 }

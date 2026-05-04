@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase, SalesTransaction, CustomerBalance } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { formatPhoneDisplay } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
 import EditBillModal from '@/components/EditBillModal';
 import PaymentModal from '@/components/PaymentModal';
@@ -204,8 +204,8 @@ export default function DeliveriesPage() {
                         >
                           {r.customer_name || r.customer_name_raw}
                         </Link>
-                        <div className="text-xs text-gray-500 flex items-center gap-2 mt-0.5">
-                          <span>{formatPhoneDisplay(r.customer_phone)}</span>
+                        <div className="text-xs text-gray-500 flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <PhoneLink phone={r.customer_phone} className="inline-flex items-center gap-1 text-gray-500 hover:text-purple-600" />
                           <span className="text-gray-300">·</span>
                           <span className="font-mono">{r.bill_no_label || r.feed_no}</span>
                         </div>
@@ -295,7 +295,7 @@ export default function DeliveriesPage() {
                           >
                             {r.customer_name || r.customer_name_raw}
                           </Link>
-                          <div className="text-xs text-gray-500">{formatPhoneDisplay(r.customer_phone)}</div>
+                          <PhoneLink phone={r.customer_phone} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600" />
                         </td>
                         <td className="px-4 py-2.5 text-right">
                           ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}

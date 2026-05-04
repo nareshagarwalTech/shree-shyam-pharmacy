@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import { formatPhoneDisplay } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
+import PhoneLink from '@/components/PhoneLink';
 import { MessageCircle, Phone, Calendar, Clock, Receipt, Search, Download } from 'lucide-react';
 
 interface ReminderLog {
@@ -222,9 +222,7 @@ export default function HistoryPage() {
                         <div className="font-medium text-gray-900 truncate">{log.customer_name}</div>
                         {statusChip(log.status)}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {formatPhoneDisplay(log.phone)}
-                      </div>
+                      <PhoneLink phone={log.phone} className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600 mt-0.5" />
                       <div className="flex items-center gap-2 text-xs text-gray-500 mt-1.5 flex-wrap">
                         <Calendar className="w-3 h-3" />
                         <span>{formatDate(log.sent_at || log.created_at, 'dd MMM yyyy hh:mm a')}</span>
@@ -276,7 +274,7 @@ export default function HistoryPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-medium text-gray-900">{log.customer_name}</div>
-                        <div className="text-sm text-gray-500">{formatPhoneDisplay(log.phone)}</div>
+                        <PhoneLink phone={log.phone} className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-purple-600" />
                       </td>
                       <td className="px-4 py-3">
                         {log.feed_no ? (
