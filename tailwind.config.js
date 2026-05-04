@@ -8,7 +8,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Primary - Emerald (Healthcare/Pharmacy feel)
+        // Primary - Emerald (dashboard legacy)
         primary: {
           50: '#ecfdf5',
           100: '#d1fae5',
@@ -20,6 +20,34 @@ module.exports = {
           700: '#047857',
           800: '#065f46',
           900: '#064e3b',
+        },
+        // Brand - Deep Green (public site, Direction A)
+        brand: {
+          50: '#f1f8f4',
+          100: '#dcede3',
+          200: '#bbdec9',
+          300: '#86c4a0',
+          400: '#54a378',
+          500: '#2f8658',
+          600: '#1f6f4a',
+          700: '#1a5b3e',
+          800: '#164a33',
+          900: '#123c2a',
+        },
+        // Cream background
+        cream: {
+          50: '#fffcf5',
+          100: '#faf7f0',
+          200: '#f3ecdc',
+          300: '#e8dcbf',
+        },
+        // Mustard accent
+        mustard: {
+          300: '#e5c777',
+          400: '#dcb85a',
+          500: '#d4a843',
+          600: '#b88a2c',
+          700: '#946d23',
         },
         // Status colors
         overdue: '#dc2626',

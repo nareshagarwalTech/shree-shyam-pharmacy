@@ -1,107 +1,87 @@
 'use client';
 
 import { useState } from 'react';
-import { supabase } from '@/lib/supabase';
-import { calculateRefillDate, toISODateString, todayISO } from '@/lib/utils';
+import { supabase, Group } from '@/lib/supabase';
 import { isValidIndianPhone } from '@/lib/whatsapp';
-import { X, Plus, Trash2, Loader2 } from 'lucide-react';
+import { X, Loader2, CheckCircle2 } from 'lucide-react';
 
-interface Medication {
-  id: string;
-  name: string;
-  quantity: number;
-  daily_dosage: number;
-  start_date: string;
-}
-
-interface AddCustomerModalProps {
+interface Props {
+  groups: Group[];
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModalProps) {
+export default function AddCustomerModal({ groups, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  
+
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [alternatePhone, setAlternatePhone] = useState('');
+  const [altPhone, setAltPhone] = useState('');
   const [address, setAddress] = useState('');
+  const [language, setLanguage] = useState<'en' | 'te' | 'hi'>('en');
+  const [bufferDays, setBufferDays] = useState(2);
   const [notes, setNotes] = useState('');
-  
-  const [medications, setMedications] = useState<Medication[]>([
-    { id: '1', name: '', quantity: 30, daily_dosage: 1, start_date: todayISO() }
-  ]);
+  const [groupIds, setGroupIds] = useState<Set<string>>(
+    new Set(groups.filter((g) => g.slug === 'regular').map((g) => g.id)),
+  );
 
-  const addMedication = () => {
-    setMedications([
-      ...medications,
-      { id: Date.now().toString(), name: '', quantity: 30, daily_dosage: 1, start_date: todayISO() }
-    ]);
+  const toggleGroup = (id: string) =>
+    setGroupIds((s) => {
+      const next = new Set(s);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const validate = () => {
+    const e: Record<string, string> = {};
+    if (!name.trim()) e.name = 'Name is required';
+    if (!phone.trim()) e.phone = 'Phone is required';
+    else if (!isValidIndianPhone(phone)) e.phone = 'Enter valid 10-digit phone';
+    if (altPhone && !isValidIndianPhone(altPhone)) e.altPhone = 'Invalid phone';
+    setErrors(e);
+    return Object.keys(e).length === 0;
   };
 
-  const removeMedication = (id: string) => {
-    if (medications.length > 1) {
-      setMedications(medications.filter(m => m.id !== id));
-    }
-  };
-
-  const updateMedication = (id: string, field: keyof Medication, value: any) => {
-    setMedications(medications.map(m => m.id === id ? { ...m, [field]: value } : m));
-  };
-
-  const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    if (!name.trim()) newErrors.name = 'Name is required';
-    if (!phone.trim()) newErrors.phone = 'Phone is required';
-    else if (!isValidIndianPhone(phone)) newErrors.phone = 'Enter valid 10-digit phone number';
-    if (alternatePhone && !isValidIndianPhone(alternatePhone)) newErrors.alternatePhone = 'Enter valid 10-digit phone number';
-    const hasValidMedication = medications.some(m => m.name.trim());
-    if (!hasValidMedication) newErrors.medications = 'Add at least one medication';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (ev: React.FormEvent) => {
+    ev.preventDefault();
     if (!validate()) return;
     setLoading(true);
-    
+
     try {
-      const { data: customer, error: customerError } = await supabase
+      const cleanPhone = phone.replace(/\D/g, '').slice(-10);
+      const { data: created, error: insertErr } = await supabase
         .from('customers')
         .insert({
           name: name.trim(),
-          phone: phone.replace(/\D/g, ''),
-          alternate_phone: alternatePhone ? alternatePhone.replace(/\D/g, '') : null,
+          phone: cleanPhone,
+          alternate_phone: altPhone ? altPhone.replace(/\D/g, '').slice(-10) : null,
           address: address.trim() || null,
+          preferred_language: language,
+          reminder_buffer_days: bufferDays,
           notes: notes.trim() || null,
+          source: 'manual',
         })
         .select()
         .single();
 
-      if (customerError) throw customerError;
+      if (insertErr) {
+        if (insertErr.code === '23505' || /duplicate/i.test(insertErr.message)) {
+          setErrors({ phone: 'A customer with this phone already exists.' });
+        } else {
+          setErrors({ submit: insertErr.message });
+        }
+        return;
+      }
 
-      const validMedications = medications.filter(m => m.name.trim());
-      if (validMedications.length > 0) {
-        const medicationsToInsert = validMedications.map(m => {
-          const refillDate = calculateRefillDate(m.start_date, m.quantity, m.daily_dosage);
-          return {
-            customer_id: customer.id,
-            name: m.name.trim(),
-            quantity: m.quantity,
-            daily_dosage: m.daily_dosage,
-            start_date: m.start_date,
-            refill_date: toISODateString(refillDate),
-          };
-        });
-        const { error: medError } = await supabase.from('medications').insert(medicationsToInsert);
-        if (medError) throw medError;
+      if (groupIds.size > 0 && created) {
+        const links = Array.from(groupIds).map((g) => ({ customer_id: created.id, group_id: g }));
+        await supabase.from('customer_groups').insert(links);
       }
       onSuccess();
-    } catch (error) {
-      console.error('Error adding customer:', error);
-      setErrors({ submit: 'Failed to add customer. Please try again.' });
+    } catch (err: any) {
+      console.error(err);
+      setErrors({ submit: err?.message || 'Failed to add customer' });
     } finally {
       setLoading(false);
     }
@@ -109,125 +89,124 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="modal-overlay absolute inset-0 bg-black/50" onClick={onClose}></div>
-      
+      <div className="modal-overlay absolute inset-0 bg-black/50" onClick={onClose} />
+
       <div className="modal-content relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-          <h2 className="text-xl font-display font-bold text-gray-900">Add New Customer</h2>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-100 transition-colors">
+          <h2 className="text-xl font-display font-bold text-gray-900">Add Customer</h2>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-gray-100"
+            aria-label="Close"
+          >
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)]">
           <div className="px-6 py-4 space-y-4">
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Customer Details</h3>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+            <Field label="Full Name" error={errors.name}>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Ramesh Kumar"
+                className={inputCls(!!errors.name)}
+                autoFocus
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Phone (primary)" error={errors.phone}>
                 <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Enter customer name"
-                  className={`w-full px-3 py-2 rounded-lg border ${errors.name ? 'border-red-300' : 'border-gray-200'} focus:border-primary-500 focus:ring-2 focus:ring-primary-100`}
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="10-digit mobile"
+                  maxLength={10}
+                  className={inputCls(!!errors.phone)}
                 />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="9876543210"
-                    maxLength={10}
-                    className={`w-full px-3 py-2 rounded-lg border ${errors.phone ? 'border-red-300' : 'border-gray-200'} focus:border-primary-500 focus:ring-2 focus:ring-primary-100`}
-                  />
-                  {errors.phone && <p className="mt-1 text-sm text-red-600">{errors.phone}</p>}
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Alternate Phone</label>
-                  <input
-                    type="tel"
-                    value={alternatePhone}
-                    onChange={(e) => setAlternatePhone(e.target.value)}
-                    placeholder="Optional"
-                    maxLength={10}
-                    className={`w-full px-3 py-2 rounded-lg border ${errors.alternatePhone ? 'border-red-300' : 'border-gray-200'} focus:border-primary-500 focus:ring-2 focus:ring-primary-100`}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              </Field>
+              <Field label="Alternate Phone" error={errors.altPhone}>
                 <input
-                  type="text"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Enter address (optional)"
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                  value={altPhone}
+                  onChange={(e) => setAltPhone(e.target.value)}
+                  placeholder="Optional"
+                  maxLength={10}
+                  className={inputCls(!!errors.altPhone)}
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Any special notes (optional)"
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100 resize-none"
-                />
-              </div>
+              </Field>
             </div>
 
-            <div className="space-y-4 pt-4 border-t border-gray-100">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Medications</h3>
-                <button type="button" onClick={addMedication} className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700 font-medium">
-                  <Plus className="w-4 h-4" />Add More
-                </button>
+            <Field label="Address">
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Optional"
+                className={inputCls(false)}
+              />
+            </Field>
+
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Preferred Language">
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value as any)}
+                  className={inputCls(false)}
+                >
+                  <option value="en">English</option>
+                  <option value="te">Telugu</option>
+                  <option value="hi">Hindi</option>
+                </select>
+              </Field>
+
+              <Field
+                label="Reminder buffer (days before)"
+                hint="How many days before the due date to remind."
+              >
+                <input
+                  type="number"
+                  min={0}
+                  max={14}
+                  value={bufferDays}
+                  onChange={(e) => setBufferDays(parseInt(e.target.value) || 0)}
+                  className={inputCls(false)}
+                />
+              </Field>
+            </div>
+
+            <Field label="Notes">
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Optional"
+                rows={2}
+                className={`${inputCls(false)} resize-none`}
+              />
+            </Field>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Groups</label>
+              <div className="flex flex-wrap gap-2">
+                {groups.map((g) => {
+                  const on = groupIds.has(g.id);
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => toggleGroup(g.id)}
+                      className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm border transition-all ${
+                        on
+                          ? 'text-white border-transparent'
+                          : 'text-gray-700 border-gray-200 hover:bg-gray-50'
+                      }`}
+                      style={on ? { backgroundColor: g.color } : undefined}
+                    >
+                      {on && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {g.icon && <span>{g.icon}</span>}
+                      {g.name}
+                    </button>
+                  );
+                })}
               </div>
-
-              {errors.medications && <p className="text-sm text-red-600">{errors.medications}</p>}
-
-              {medications.map((med, index) => (
-                <div key={med.id} className="p-4 bg-gray-50 rounded-lg space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700">Medication {index + 1}</span>
-                    {medications.length > 1 && (
-                      <button type="button" onClick={() => removeMedication(med.id)} className="p-1 text-red-500 hover:bg-red-50 rounded">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                  <input
-                    type="text"
-                    value={med.name}
-                    onChange={(e) => updateMedication(med.id, 'name', e.target.value)}
-                    placeholder="Medicine name (e.g., Metformin 500mg)"
-                    className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                  />
-                  <div className="grid grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Quantity</label>
-                      <input type="number" value={med.quantity} onChange={(e) => updateMedication(med.id, 'quantity', parseInt(e.target.value) || 0)} min="1" className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Per Day</label>
-                      <input type="number" value={med.daily_dosage} onChange={(e) => updateMedication(med.id, 'daily_dosage', parseInt(e.target.value) || 1)} min="1" className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">Start Date</label>
-                      <input type="date" value={med.start_date} onChange={(e) => updateMedication(med.id, 'start_date', e.target.value)} className="w-full px-3 py-2 rounded-lg border border-gray-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100" />
-                    </div>
-                  </div>
-                </div>
-              ))}
             </div>
 
             {errors.submit && (
@@ -238,14 +217,51 @@ export default function AddCustomerModal({ onClose, onSuccess }: AddCustomerModa
           </div>
 
           <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-3">
-            <button type="button" onClick={onClose} className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-            <button type="submit" disabled={loading} className="flex items-center gap-2 px-4 py-2 bg-primary-500 hover:bg-primary-600 text-white font-medium rounded-lg transition-colors disabled:opacity-50">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg disabled:opacity-50"
+            >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {loading ? 'Adding...' : 'Add Customer'}
+              {loading ? 'Adding…' : 'Add Customer'}
             </button>
           </div>
         </form>
       </div>
     </div>
   );
+}
+
+function Field({
+  label,
+  error,
+  hint,
+  children,
+}: {
+  label: string;
+  error?: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
+      {children}
+      {hint && !error && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
+      {error && <p className="mt-1 text-sm text-red-600">{error}</p>}
+    </div>
+  );
+}
+
+function inputCls(hasError: boolean) {
+  return `w-full px-3 py-2 rounded-lg border bg-white ${
+    hasError ? 'border-red-300' : 'border-gray-200'
+  } focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100`;
 }

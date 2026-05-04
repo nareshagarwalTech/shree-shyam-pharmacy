@@ -5,60 +5,217 @@ const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Types for our database
+// ---------------------------------------------------------------------------
+// Database types — mirror of supabase/migrations/001_groups_and_sales.sql
+// ---------------------------------------------------------------------------
+
+export interface Group {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  color: string;
+  icon: string | null;
+  sort_order: number;
+  is_system: boolean;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Customer {
   id: string;
-  name: string;
   phone: string;
-  alternate_phone?: string;
-  address?: string;
-  notes?: string;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Medication {
-  id: string;
-  customer_id: string;
   name: string;
-  quantity: number;
-  daily_dosage: number;
-  start_date: string;
-  refill_date: string;
+  alternate_phone?: string | null;
+  address?: string | null;
+  email?: string | null;
+  preferred_language: 'en' | 'te' | 'hi';
+  reminder_buffer_days: number;
+  whatsapp_opt_out: boolean;
+  whatsapp_opt_out_at?: string | null;
+  reminders_paused_until?: string | null;
+  notes?: string | null;
+  source: 'manual' | 'master_import' | 'sale_import';
   is_active: boolean;
-  notes?: string;
   created_at: string;
   updated_at: string;
 }
 
-export interface ReminderHistory {
+export type PaymentMode = 'cash' | 'online' | 'credit' | null;
+
+export interface SalesTransaction {
   id: string;
-  customer_id: string;
-  medication_id?: string;
-  channel: 'whatsapp' | 'sms' | 'call';
-  status: 'sent' | 'delivered' | 'failed';
-  message?: string;
-  sent_at: string;
-  sent_by: string;
+  feed_no: string;
+  feed_date: string;                      // ISO date (legacy alias of delivery_date)
+  customer_phone: string;
+  customer_id: string | null;
+  customer_name_raw: string | null;
+  address_raw: string | null;
+  net_amount: number | null;
+  for_days: number | null;
+  reminder_date: string | null;           // computed by DB trigger
+  match_confidence: 'exact' | 'fuzzy' | 'unmatched' | 'auto_created';
+  fuzzy_match_score: number | null;
+  notes: string | null;
+  import_batch_id: string | null;
+  imported_at: string;
+  // Migration 003 — delivery + payment fields
+  bill_no_label: string | null;
+  delivery_date: string | null;
+  prev_pending: number | null;
+  total_due: number | null;
+  customer_paid: number | null;
+  change_given: number | null;
+  balance_left: number | null;
+  payment_mode: PaymentMode;
+  payment_date: string | null;
+  delivery_notes: string | null;
 }
 
-export interface CustomerReminder {
+// Roll-up views from migration 003
+export interface CustomerBalance {
   customer_id: string;
   customer_name: string;
   phone: string;
-  address?: string;
-  medication_id: string;
-  medication_name: string;
-  quantity: number;
-  daily_dosage: number;
-  refill_date: string;
-  days_until_refill: number;
-  status: 'overdue' | 'urgent' | 'soon' | 'ok';
-  last_reminder_sent?: string;
+  alternate_phone: string | null;
+  address: string | null;
+  preferred_language: 'en' | 'te' | 'hi';
+  whatsapp_opt_out: boolean;
+  total_billed: number;
+  total_collected: number;
+  total_change_given: number;
+  outstanding: number;
+  bill_count: number;
+  last_delivery_date: string | null;
+  last_payment_date: string | null;
+  balance_status: 'PENDING' | 'CLEAR';
 }
 
-// Customer with medications
-export interface CustomerWithMedications extends Customer {
-  medications: Medication[];
+// Migration 004 — payment-centric daily summary
+export interface DailyCollection {
+  date: string;                    // ISO date — payment_date
+  bills_paid: number;
+  cash_received: number;
+  online_received: number;
+  total_collected: number;
+  change_given: number;
+  billed_same_day: number;         // collected for today's deliveries
+  old_due_collected: number;       // collected for older outstanding bills
+}
+
+export interface MonthlyCollection {
+  month: string;                   // first-of-month ISO date
+  month_label: string;             // 'YYYY-MM'
+  bills_paid: number;
+  unique_customers: number;
+  cash_received: number;
+  online_received: number;
+  total_collected: number;
+  change_given: number;
+  avg_per_bill: number;
+}
+
+export interface CustomerAging {
+  customer_id: string;
+  customer_name: string;
+  phone: string;
+  oldest_age_days: number;
+  oldest_unpaid_date: string | null;
+  outstanding: number;
+  bucket_0_30: number;
+  bucket_31_60: number;
+  bucket_61_90: number;
+  bucket_90_plus: number;
+  unpaid_bill_count: number;
+}
+
+export interface TopCustomer {
+  customer_id: string;
+  customer_name: string;
+  phone: string;
+  bill_count: number;
+  total_billed: number;
+  total_collected: number;
+  outstanding: number;
+  last_purchase_date: string | null;
+  last_payment_date: string | null;
+  avg_days_to_pay: number | null;
+}
+
+export interface Reminder {
+  id: string;
+  customer_id: string;
+  sales_transaction_id: string | null;
+  scheduled_for: string | null;
+  channel: 'whatsapp' | 'sms' | 'call';
+  send_method: 'manual_walink' | 'api_automated' | 'api_bulk_manual';
+  status: 'queued' | 'sent' | 'delivered' | 'read' | 'failed' | 'cancelled';
+  wa_message_id: string | null;
+  template_name: string | null;
+  template_language: string;
+  message_content: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+  read_at: string | null;
+  failed_reason: string | null;
+  sent_by: string;
+  created_at: string;
+}
+
+// Status categories for the dashboard — match SQL view
+export type ReminderStatus =
+  | 'overdue'
+  | 'urgent'
+  | 'soon'
+  | 'ok'
+  | 'paused'
+  | 'opted_out'
+  | 'no_sales';
+
+// One row per customer — read by the dashboard
+export interface CustomerNextReminder {
+  customer_id: string;
+  phone: string;
+  customer_name: string;
+  alternate_phone: string | null;
+  address: string | null;
+  preferred_language: 'en' | 'te' | 'hi';
+  reminder_buffer_days: number;
+  whatsapp_opt_out: boolean;
+  reminders_paused_until: string | null;
+  notes: string | null;
+  last_sale_id: string | null;
+  last_feed_no: string | null;
+  last_purchase_date: string | null;
+  last_for_days: number | null;
+  reminder_date: string | null;
+  last_amount: number | null;
+  reminder_trigger_date: string | null;
+  days_until_reminder: number | null;
+  status: ReminderStatus;
+  last_reminder_sent: string | null;
+  group_slugs: string[];
+  group_names: string[];
+}
+
+// For the customer management page
+export interface CustomerWithGroups extends Customer {
+  groups: Array<Pick<Group, 'id' | 'name' | 'slug' | 'color' | 'icon'>>;
+  total_sales: number;
+  total_spent: number | null;
+  last_purchase_date: string | null;
+}
+
+export interface ImportBatch {
+  id: string;
+  filename: string | null;
+  source_type: 'master_customers' | 'daily_sales';
+  uploaded_by: string;
+  row_count: number;
+  success_count: number;
+  skipped_count: number;
+  error_count: number;
+  notes: string | null;
+  created_at: string;
 }
