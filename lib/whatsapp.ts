@@ -72,6 +72,55 @@ export function formatPhoneDisplay(phone: string): string {
   return phone;
 }
 
+/**
+ * Generate an outstanding-due reminder message ("you owe ₹X, please clear it").
+ * Used by the /dashboard/pending bulk-send action.
+ */
+export function generateDueMessage(
+  customerName: string,
+  outstandingAmount: number,
+  language: Lang = 'en',
+): string {
+  const amt = `₹${Math.round(outstandingAmount).toLocaleString('en-IN')}`;
+  const customer = customerName.trim();
+
+  if (language === 'te') {
+    return `🏥 *${PHARMACY_INFO.name}*
+
+నమస్కారం ${customer} గారు,
+
+మీ బకాయి *${amt}* ఉంది. దయచేసి సౌకర్యంగా ఉన్నప్పుడు చెల్లించండి.
+
+📍 ${PHARMACY_INFO.address}
+📞 ${PHARMACY_INFO.phone}
+
+ధన్యవాదాలు! 🙏`;
+  }
+  if (language === 'hi') {
+    return `🏥 *${PHARMACY_INFO.name}*
+
+Namaste ${customer} ji,
+
+आपका बकाया *${amt}* है। कृपया जब सुविधा हो भुगतान कर दीजिए।
+
+📍 ${PHARMACY_INFO.address}
+📞 ${PHARMACY_INFO.phone}
+
+धन्यवाद! 🙏`;
+  }
+  return `🏥 *${PHARMACY_INFO.name}*
+
+Namaste ${customer} ji,
+
+This is a friendly reminder that your outstanding balance is *${amt}*.
+Please clear it at your convenience — visit us or pay online.
+
+📍 ${PHARMACY_INFO.address}
+📞 ${PHARMACY_INFO.phone}
+
+Thank you! 🙏`;
+}
+
 /** Indian 10-digit (starts 6-9) or 12-digit with 91 prefix */
 export function isValidIndianPhone(phone: string): boolean {
   const clean = String(phone).replace(/\D/g, '');

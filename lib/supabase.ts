@@ -42,10 +42,12 @@ export interface Customer {
   updated_at: string;
 }
 
+export type PaymentMode = 'cash' | 'online' | 'credit' | null;
+
 export interface SalesTransaction {
   id: string;
   feed_no: string;
-  feed_date: string;                      // ISO date
+  feed_date: string;                      // ISO date (legacy alias of delivery_date)
   customer_phone: string;
   customer_id: string | null;
   customer_name_raw: string | null;
@@ -58,6 +60,47 @@ export interface SalesTransaction {
   notes: string | null;
   import_batch_id: string | null;
   imported_at: string;
+  // Migration 003 — delivery + payment fields
+  bill_no_label: string | null;
+  delivery_date: string | null;
+  prev_pending: number | null;
+  total_due: number | null;
+  customer_paid: number | null;
+  change_given: number | null;
+  balance_left: number | null;
+  payment_mode: PaymentMode;
+  payment_date: string | null;
+  delivery_notes: string | null;
+}
+
+// Roll-up views from migration 003
+export interface CustomerBalance {
+  customer_id: string;
+  customer_name: string;
+  phone: string;
+  alternate_phone: string | null;
+  address: string | null;
+  preferred_language: 'en' | 'te' | 'hi';
+  whatsapp_opt_out: boolean;
+  total_billed: number;
+  total_collected: number;
+  total_change_given: number;
+  outstanding: number;
+  bill_count: number;
+  last_delivery_date: string | null;
+  last_payment_date: string | null;
+  balance_status: 'PENDING' | 'CLEAR';
+}
+
+export interface DailyCollection {
+  date: string;                    // ISO date
+  bills_delivered: number;
+  total_billed: number;
+  change_given: number;
+  cash_received: number;
+  online_received: number;
+  credit_given: number;
+  balance_left: number;
 }
 
 export interface Reminder {
