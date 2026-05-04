@@ -162,7 +162,46 @@ export default function TopCustomersPage() {
             <p className="text-gray-500">No customers match.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {filtered.map((r, i) => (
+                <div key={r.customer_id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3 flex items-start gap-3">
+                  <div className="shrink-0 w-9 h-9 rounded-full bg-amber-50 text-amber-700 flex items-center justify-center font-mono font-bold text-sm">
+                    {i + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <Link
+                        href={`/dashboard/customer/${r.phone}`}
+                        className="font-semibold text-gray-900 hover:text-emerald-600 truncate"
+                      >
+                        {r.customer_name}
+                      </Link>
+                      <div className="text-base font-display font-bold text-gray-900 shrink-0">
+                        ₹{Number(r.total_billed).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {formatPhoneDisplay(r.phone)} · {r.bill_count} bill{r.bill_count === 1 ? '' : 's'} · last {r.last_delivery_date ? formatDate(r.last_delivery_date) : '—'}
+                    </div>
+                    <div className="flex items-center gap-3 text-xs mt-1.5">
+                      <span className="text-emerald-700">
+                        Paid ₹{Number(r.total_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </span>
+                      {Number(r.outstanding) > 0 && (
+                        <span className="text-red-600 font-semibold">
+                          Owes ₹{Number(r.outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
@@ -207,7 +246,8 @@ export default function TopCustomersPage() {
                 ))}
               </tbody>
             </table>
-          </div>
+            </div>
+          </>
         )}
       </main>
 

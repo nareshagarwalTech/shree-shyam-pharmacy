@@ -91,8 +91,8 @@ export default function AddCustomerModal({ groups, onClose, onSuccess }: Props) 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="modal-overlay absolute inset-0 bg-black/50" onClick={onClose} />
 
-      <div className="modal-content relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+      <div className="modal-content relative bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
           <h2 className="text-xl font-display font-bold text-gray-900">Add Customer</h2>
           <button
             onClick={onClose}
@@ -103,7 +103,7 @@ export default function AddCustomerModal({ groups, onClose, onSuccess }: Props) 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-140px)]">
+        <form onSubmit={handleSubmit} className="overflow-y-auto flex-1 min-h-0">
           <div className="px-6 py-4 space-y-4">
             <Field label="Full Name" error={errors.name}>
               <input

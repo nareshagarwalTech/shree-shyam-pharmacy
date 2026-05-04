@@ -236,7 +236,55 @@ export default function DailyCollectionPage() {
             <p className="text-xs text-gray-400 mt-1">Collections will appear here when staff records payments in deliveries.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {rows.map((r) => (
+                <div key={r.date} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-semibold text-gray-900">{formatDate(r.date)}</div>
+                    <div className="text-base font-display font-bold text-gray-900">
+                      ₹{Number(r.total_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-1.5 text-xs">
+                    <span className="text-emerald-700 bg-emerald-50 rounded px-2 py-1">
+                      Cash ₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </span>
+                    <span className="text-cyan-700 bg-cyan-50 rounded px-2 py-1">
+                      Online ₹{Number(r.online_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                    </span>
+                    {Number(r.change_given) > 0 && (
+                      <span className="text-amber-700 bg-amber-50 rounded px-2 py-1">
+                        Change ₹{Number(r.change_given).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </span>
+                    )}
+                    <span className="text-gray-700 bg-gray-50 rounded px-2 py-1">
+                      {r.payment_count} payment{r.payment_count === 1 ? '' : 's'}
+                    </span>
+                  </div>
+                  {(Number(r.billed_same_day) > 0 || Number(r.old_due_collected) > 0) && (
+                    <div className="mt-2 text-[11px] text-gray-500 flex items-center gap-2">
+                      {Number(r.billed_same_day) > 0 && <span>Same-day ₹{Number(r.billed_same_day).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>}
+                      {Number(r.old_due_collected) > 0 && <span>· Old-due ₹{Number(r.old_due_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Totals */}
+              <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 mt-3">
+                <div className="font-semibold text-xs uppercase text-gray-600 mb-1">Totals</div>
+                <div className="text-2xl font-display font-bold text-gray-900">
+                  ₹{totals.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                </div>
+                <div className="text-xs text-gray-600 mt-1">
+                  Cash ₹{totals.cash.toLocaleString('en-IN')} · Online ₹{totals.online.toLocaleString('en-IN')} · {totals.bills} payments
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -291,7 +339,8 @@ export default function DailyCollectionPage() {
                 </tfoot>
               </table>
             </div>
-          </div>
+            </div>
+          </>
         )}
       </main>
 

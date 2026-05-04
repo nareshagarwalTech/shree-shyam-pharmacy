@@ -77,14 +77,14 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 modal-overlay" onClick={onClose} />
-      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md modal-content">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md modal-content max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
           <h3 className="font-display font-bold text-gray-900 text-lg">Edit Customer</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-gray-100">
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
-        <div className="px-6 py-4 space-y-4">
+        <div className="px-6 py-4 space-y-4 overflow-y-auto">
           <Field label="Name *">
             <input
               value={name}
@@ -164,7 +164,7 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
             </div>
           )}
         </div>
-        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-2xl">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-2xl shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-gray-700 font-medium hover:bg-white rounded-lg">
             Cancel
           </button>

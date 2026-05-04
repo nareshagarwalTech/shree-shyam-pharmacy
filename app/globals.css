@@ -257,3 +257,32 @@ input[type="file"]::file-selector-button:hover {
 .animate-slideUp {
   animation: slideUp 0.3s ease-out;
 }
+
+/* Safe-area utilities for iOS home indicator + notch */
+.safe-pb {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-pt {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-pl {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-pr {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Prevent body scroll lock pages from leaking horizontal overflow on small screens */
+html, body {
+  overflow-x: hidden;
+}
+
+/* Better touch targets on mobile */
+@media (max-width: 640px) {
+  button, a {
+    -webkit-tap-highlight-color: transparent;
+  }
+}

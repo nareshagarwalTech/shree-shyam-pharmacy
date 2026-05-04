@@ -210,7 +210,43 @@ export default function HistoryPage() {
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {filtered.map((log) => (
+                <div key={log.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                  <div className="flex items-start gap-3">
+                    <div className="shrink-0 mt-0.5">{channelIcon(log.channel)}</div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="font-medium text-gray-900 truncate">{log.customer_name}</div>
+                        {statusChip(log.status)}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {formatPhoneDisplay(log.phone)}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gray-500 mt-1.5 flex-wrap">
+                        <Calendar className="w-3 h-3" />
+                        <span>{formatDate(log.sent_at || log.created_at, 'dd MMM yyyy hh:mm a')}</span>
+                        {log.feed_no && (
+                          <>
+                            <span className="text-gray-300">·</span>
+                            <Receipt className="w-3 h-3 text-emerald-500" />
+                            <span>{log.feed_no}</span>
+                          </>
+                        )}
+                        <span className="text-gray-300">·</span>
+                        <span className="font-mono">{log.send_method}</span>
+                        <span className="uppercase">{log.template_language}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
@@ -269,7 +305,8 @@ export default function HistoryPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+            </div>
+          </>
         )}
       </main>
     </div>

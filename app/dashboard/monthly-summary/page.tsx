@@ -165,34 +165,71 @@ export default function MonthlyCollectionPage() {
             <p className="text-gray-500">No collections recorded yet.</p>
           </div>
         ) : (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr>
-                  <Th>Month</Th>
-                  <Th align="right">Bills Paid</Th>
-                  <Th align="right">Customers</Th>
-                  <Th align="right">Cash</Th>
-                  <Th align="right">Online</Th>
-                  <Th align="right">Total</Th>
-                  <Th align="right">Avg/Bill</Th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {rows.map((r) => (
-                  <tr key={r.month_label} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.month_label}</td>
-                    <td className="px-4 py-3 text-right text-sm">{r.payment_count}</td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-600">{r.unique_customers}</td>
-                    <td className="px-4 py-3 text-right text-sm text-emerald-700">₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                    <td className="px-4 py-3 text-right text-sm text-cyan-700">₹{Number(r.online_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                    <td className="px-4 py-3 text-right text-sm font-semibold">₹{Number(r.total_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-600">₹{Number(r.avg_per_payment || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+          <>
+            {/* Mobile cards */}
+            <div className="md:hidden space-y-2">
+              {rows.map((r) => {
+                const cash = Number(r.cash_received);
+                const online = Number(r.online_received);
+                const total = Number(r.total_collected);
+                return (
+                  <div key={r.month_label} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="font-semibold text-gray-900">{r.month_label}</div>
+                      <div className="text-base font-display font-bold text-gray-900">
+                        ₹{total.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                      <span className="text-emerald-700">
+                        Cash ₹{cash.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </span>
+                      <span className="text-cyan-700">
+                        Online ₹{online.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500 mt-1.5">
+                      <span>{r.payment_count} payment{Number(r.payment_count) === 1 ? '' : 's'}</span>
+                      <span className="text-gray-300">·</span>
+                      <span>{r.unique_customers} customer{Number(r.unique_customers) === 1 ? '' : 's'}</span>
+                      <span className="text-gray-300">·</span>
+                      <span>avg ₹{Number(r.avg_per_payment || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop table */}
+            <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <Th>Month</Th>
+                    <Th align="right">Bills Paid</Th>
+                    <Th align="right">Customers</Th>
+                    <Th align="right">Cash</Th>
+                    <Th align="right">Online</Th>
+                    <Th align="right">Total</Th>
+                    <Th align="right">Avg/Bill</Th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {rows.map((r) => (
+                    <tr key={r.month_label} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.month_label}</td>
+                      <td className="px-4 py-3 text-right text-sm">{r.payment_count}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-600">{r.unique_customers}</td>
+                      <td className="px-4 py-3 text-right text-sm text-emerald-700">₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right text-sm text-cyan-700">₹{Number(r.online_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold">₹{Number(r.total_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-600">₹{Number(r.avg_per_payment || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </main>
 

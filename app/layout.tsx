@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: 'Shree Shyam Pharmacy | Your Trusted Neighbourhood Pharmacy in Hyderabad',
   description: 'Quality medicines at affordable prices with home delivery in Kukatpally, Hyderabad. Order via WhatsApp!',
   themeColor: '#10b981',
-  viewport: 'width=device-width, initial-scale=1, maximum-scale=1',
+  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
 };
 
 export default function RootLayout({

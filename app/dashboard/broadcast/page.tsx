@@ -423,8 +423,8 @@ export default function BroadcastPage() {
 
       {/* Sticky footer with send actions */}
       {selectedRecipientList.length > 0 && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg">
-          <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 shadow-lg safe-pb">
+          <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div className="text-sm">
               <strong className="text-purple-700">{selectedRecipientList.length}</strong>{' '}
               <span className="text-gray-600">recipient{selectedRecipientList.length === 1 ? '' : 's'} selected</span>
@@ -432,21 +432,21 @@ export default function BroadcastPage() {
                 <span className="ml-3 text-emerald-700">{sentInSession.size} marked sent</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
               <button
                 onClick={markAllSent}
                 disabled={selectedRecipientList.length === 0}
-                className="flex items-center gap-2 px-3 py-2 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-medium rounded-lg text-sm"
+                className="flex items-center justify-center gap-2 px-3 py-2 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-medium rounded-lg text-sm flex-1 sm:flex-initial"
               >
                 <CheckCircle className="w-4 h-4" /> Mark all sent
               </button>
               <button
                 onClick={sendAll}
                 disabled={!body.trim() || selectedRecipientList.length === 0}
-                className="flex items-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-lg text-sm disabled:bg-gray-300"
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-lg text-sm disabled:bg-gray-300 flex-1 sm:flex-initial"
               >
                 <Send className="w-4 h-4" />
-                Open WhatsApp for {selectedRecipientList.length}
+                <span className="truncate">Open WhatsApp ({selectedRecipientList.length})</span>
               </button>
             </div>
           </div>
