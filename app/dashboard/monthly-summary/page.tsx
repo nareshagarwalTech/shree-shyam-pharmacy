@@ -34,7 +34,7 @@ export default function MonthlyCollectionPage() {
 
   const totals = useMemo(() => ({
     months: rows.length,
-    bills: rows.reduce((s, r) => s + Number(r.bills_paid || 0), 0),
+    bills: rows.reduce((s, r) => s + Number(r.payment_count || 0), 0),
     cash: rows.reduce((s, r) => s + Number(r.cash_received || 0), 0),
     online: rows.reduce((s, r) => s + Number(r.online_received || 0), 0),
     total: rows.reduce((s, r) => s + Number(r.total_collected || 0), 0),
@@ -50,10 +50,10 @@ export default function MonthlyCollectionPage() {
   }, [rows]);
 
   const exportCsv = () => {
-    const headers = ['Month', 'Bills Paid', 'Unique Customers', 'Cash', 'Online', 'Total', 'Change Given', 'Avg per Bill'];
+    const headers = ['Month', 'Payments', 'Unique Customers', 'Cash', 'Online', 'Total', 'Avg per Payment'];
     const lines = [headers.join(',')];
     for (const r of rows) {
-      lines.push([r.month_label, r.bills_paid, r.unique_customers, r.cash_received, r.online_received, r.total_collected, r.change_given, r.avg_per_bill].join(','));
+      lines.push([r.month_label, r.payment_count, r.unique_customers, r.cash_received, r.online_received, r.total_collected, r.avg_per_payment].join(','));
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -135,7 +135,7 @@ export default function MonthlyCollectionPage() {
                   <div
                     key={r.month_label}
                     className="flex-1 flex flex-col items-center min-w-0 group"
-                    title={`${r.month_label}\nCash ₹${cash.toLocaleString('en-IN')}\nOnline ₹${online.toLocaleString('en-IN')}\nTotal ₹${total.toLocaleString('en-IN')}\n${r.bills_paid} bills`}
+                    title={`${r.month_label}\nCash ₹${cash.toLocaleString('en-IN')}\nOnline ₹${online.toLocaleString('en-IN')}\nTotal ₹${total.toLocaleString('en-IN')}\n${r.payment_count} bills`}
                   >
                     <div className="text-[10px] text-gray-500 mb-1">
                       {total > 0 ? `₹${(total / 1000).toFixed(0)}k` : ''}
@@ -182,12 +182,12 @@ export default function MonthlyCollectionPage() {
                 {rows.map((r) => (
                   <tr key={r.month_label} className="hover:bg-gray-50">
                     <td className="px-4 py-3 text-sm font-medium text-gray-900">{r.month_label}</td>
-                    <td className="px-4 py-3 text-right text-sm">{r.bills_paid}</td>
+                    <td className="px-4 py-3 text-right text-sm">{r.payment_count}</td>
                     <td className="px-4 py-3 text-right text-sm text-gray-600">{r.unique_customers}</td>
                     <td className="px-4 py-3 text-right text-sm text-emerald-700">₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
                     <td className="px-4 py-3 text-right text-sm text-cyan-700">₹{Number(r.online_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
                     <td className="px-4 py-3 text-right text-sm font-semibold">₹{Number(r.total_collected).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
-                    <td className="px-4 py-3 text-right text-sm text-gray-600">₹{Number(r.avg_per_bill || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                    <td className="px-4 py-3 text-right text-sm text-gray-600">₹{Number(r.avg_per_payment || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>

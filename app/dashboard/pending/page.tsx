@@ -85,40 +85,25 @@ export default function PendingPage() {
   };
 
   const markPaid = async (r: CustomerBalance, mode: 'cash' | 'online') => {
-    if (!confirm(`Mark all outstanding ₹${Math.round(r.outstanding)} for ${r.customer_name} as paid (${mode})?`)) return;
+    const amt = Number(r.outstanding);
+    if (!confirm(`Record a ₹${Math.round(amt)} ${mode} payment for ${r.customer_name}?\n\nThis clears the outstanding balance entirely.`)) return;
     setMarkingPaid(r.customer_id);
 
-    // Find unpaid sales (where customer_paid < net_amount)
-    const { data: unpaidSales, error: e1 } = await supabase
-      .from('sales_transactions')
-      .select('id, net_amount, customer_paid')
-      .eq('customer_id', r.customer_id);
-    if (e1) {
-      setToast({ message: e1.message, type: 'error' });
-      setMarkingPaid(null);
+    const today = new Date().toISOString().slice(0, 10);
+    const { error } = await supabase.from('payments').insert({
+      customer_id: r.customer_id,
+      amount: amt,
+      mode,
+      payment_date: today,
+      notes: 'cleared from pending list',
+    });
+
+    setMarkingPaid(null);
+    if (error) {
+      setToast({ message: error.message, type: 'error' });
       return;
     }
-    const today = new Date().toISOString().slice(0, 10);
-    const updates = (unpaidSales || []).map((s) => ({
-      id: s.id,
-      customer_paid: s.net_amount,
-      payment_mode: mode,
-      payment_date: today,
-      balance_left: 0,
-    }));
-    // Bulk update one-by-one (small set)
-    let okCount = 0;
-    for (const u of updates) {
-      const { error } = await supabase.from('sales_transactions').update({
-        customer_paid: u.customer_paid,
-        payment_mode: u.payment_mode,
-        payment_date: u.payment_date,
-        balance_left: 0,
-      }).eq('id', u.id);
-      if (!error) okCount++;
-    }
-    setToast({ message: `Marked ${okCount} bill(s) as paid.`, type: 'success' });
-    setMarkingPaid(null);
+    setToast({ message: `Recorded ₹${Math.round(amt)} ${mode} payment.`, type: 'success' });
     setRefreshing(true);
     fetchPending();
   };

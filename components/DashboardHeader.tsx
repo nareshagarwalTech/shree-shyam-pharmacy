@@ -34,6 +34,7 @@ const PRIMARY = [
 
 const MORE = [
   { href: '/dashboard/customers',       label: 'Customers',          icon: Users },
+  { href: '/dashboard/top-customers',   label: 'Top Customers',      icon: TrendingUp },
   { href: '/dashboard/daily-summary',   label: 'Daily Collection',   icon: BarChart3 },
   { href: '/dashboard/monthly-summary', label: 'Monthly Collection', icon: BarChart3 },
   { href: '/dashboard/aging',           label: 'Aging Report',       icon: AlertTriangle },

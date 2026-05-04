@@ -44,6 +44,22 @@ export interface Customer {
 
 export type PaymentMode = 'cash' | 'online' | 'credit' | null;
 
+// Migration 005 — payments table is the source of truth for received money
+export type PaymentChannel = 'cash' | 'online' | 'cheque' | 'card' | 'other';
+
+export interface Payment {
+  id: string;
+  customer_id: string;
+  sales_transaction_id: string | null;
+  amount: number;
+  mode: PaymentChannel;
+  payment_date: string;          // ISO date
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
 export interface SalesTransaction {
   id: string;
   feed_no: string;
@@ -73,7 +89,7 @@ export interface SalesTransaction {
   delivery_notes: string | null;
 }
 
-// Roll-up views from migration 003
+// Roll-up views — updated for migration 005 (payments table)
 export interface CustomerBalance {
   customer_id: string;
   customer_name: string;
@@ -87,33 +103,40 @@ export interface CustomerBalance {
   total_change_given: number;
   outstanding: number;
   bill_count: number;
+  payment_count: number;
   last_delivery_date: string | null;
   last_payment_date: string | null;
   balance_status: 'PENDING' | 'CLEAR';
 }
 
-// Migration 004 — payment-centric daily summary
+// Migration 005 — sourced from payments table
 export interface DailyCollection {
   date: string;                    // ISO date — payment_date
-  bills_paid: number;
+  payment_count: number;           // number of payment events
+  unique_customers: number;
   cash_received: number;
   online_received: number;
+  other_received: number;
   total_collected: number;
   change_given: number;
-  billed_same_day: number;         // collected for today's deliveries
-  old_due_collected: number;       // collected for older outstanding bills
+  billed_same_day: number;
+  old_due_collected: number;
+  // Backward-compat alias (deprecated)
+  bills_paid?: number;
 }
 
 export interface MonthlyCollection {
   month: string;                   // first-of-month ISO date
   month_label: string;             // 'YYYY-MM'
-  bills_paid: number;
+  payment_count: number;
   unique_customers: number;
   cash_received: number;
   online_received: number;
   total_collected: number;
-  change_given: number;
-  avg_per_bill: number;
+  avg_per_payment: number;
+  // Backward-compat alias (deprecated)
+  bills_paid?: number;
+  avg_per_bill?: number;
 }
 
 export interface CustomerAging {
@@ -135,10 +158,11 @@ export interface TopCustomer {
   customer_name: string;
   phone: string;
   bill_count: number;
+  payment_count: number;
   total_billed: number;
   total_collected: number;
   outstanding: number;
-  last_purchase_date: string | null;
+  last_delivery_date: string | null;
   last_payment_date: string | null;
   avg_days_to_pay: number | null;
 }

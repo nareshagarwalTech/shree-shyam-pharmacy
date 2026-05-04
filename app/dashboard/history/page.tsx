@@ -1,11 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import { formatPhoneDisplay } from '@/lib/whatsapp';
 import DashboardHeader from '@/components/DashboardHeader';
-import { MessageCircle, Phone, Calendar, Clock, Receipt } from 'lucide-react';
+import { MessageCircle, Phone, Calendar, Clock, Receipt, Search, Download } from 'lucide-react';
 
 interface ReminderLog {
   id: string;
@@ -25,6 +26,8 @@ export default function HistoryPage() {
   const [history, setHistory] = useState<ReminderLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [dateFilter, setDateFilter] = useState('all');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
   const fetchHistory = useCallback(async () => {
     setLoading(true);
@@ -76,6 +79,20 @@ export default function HistoryPage() {
     fetchHistory();
   }, [fetchHistory]);
 
+  const filtered = useMemo(() => {
+    let out = history;
+    if (customerFilter) {
+      const q = customerFilter.toLowerCase().trim();
+      out = out.filter(
+        (h) =>
+          h.customer_name.toLowerCase().includes(q) ||
+          h.phone.includes(q.replace(/\D/g, '')),
+      );
+    }
+    if (statusFilter !== 'all') out = out.filter((h) => h.status === statusFilter);
+    return out;
+  }, [history, customerFilter, statusFilter]);
+
   const channelIcon = (ch: string) => {
     if (ch === 'whatsapp') return <MessageCircle className="w-4 h-4 text-green-500" />;
     if (ch === 'sms') return <MessageCircle className="w-4 h-4 text-blue-500" />;
@@ -109,27 +126,88 @@ export default function HistoryPage() {
             <h1 className="text-2xl font-display font-bold text-gray-900">Reminder History</h1>
             <p className="text-sm text-gray-500">Audit log of reminders sent to customers.</p>
           </div>
-          <select
-            value={dateFilter}
-            onChange={(e) => setDateFilter(e.target.value)}
-            className="px-4 py-2 rounded-lg border border-gray-200 bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+          <button
+            onClick={() => {
+              const headers = ['Date', 'Customer', 'Phone', 'Bill', 'Channel', 'Method', 'Lang', 'Status'];
+              const lines = [headers.join(',')];
+              for (const log of filtered) {
+                lines.push([
+                  log.sent_at || log.created_at,
+                  `"${log.customer_name.replace(/"/g, '""')}"`,
+                  log.phone,
+                  log.feed_no || '',
+                  log.channel,
+                  log.send_method,
+                  log.template_language,
+                  log.status,
+                ].join(','));
+              }
+              const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = `reminder-history.csv`;
+              a.click();
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium"
           >
-            <option value="all">All Time</option>
-            <option value="today">Today</option>
-            <option value="week">Last 7 Days</option>
-            <option value="month">Last 30 Days</option>
-          </select>
+            <Download className="w-4 h-4" /> CSV
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Filter by customer or phone…"
+                value={customerFilter}
+                onChange={(e) => setCustomerFilter(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+              />
+            </div>
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium"
+            >
+              <option value="all">All statuses</option>
+              <option value="queued">Queued</option>
+              <option value="sent">Sent</option>
+              <option value="delivered">Delivered</option>
+              <option value="read">Read</option>
+              <option value="failed">Failed</option>
+            </select>
+            <select
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-medium"
+            >
+              <option value="all">All Time</option>
+              <option value="today">Today</option>
+              <option value="week">Last 7 Days</option>
+              <option value="month">Last 30 Days</option>
+            </select>
+            <span className="text-sm text-gray-500 ml-auto">
+              {filtered.length} of {history.length} reminders
+            </span>
+          </div>
         </div>
 
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="spinner" />
           </div>
-        ) : history.length === 0 ? (
+        ) : filtered.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
             <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-700 mb-2">No reminders sent yet</h3>
-            <p className="text-gray-500">Reminders will appear here once sent.</p>
+            <h3 className="text-lg font-semibold text-gray-700 mb-2">
+              {history.length === 0 ? 'No reminders sent yet' : 'No reminders match the filter'}
+            </h3>
+            <p className="text-gray-500">
+              {history.length === 0 ? 'Reminders will appear here once sent.' : 'Try clearing the filter or selecting a different range.'}
+            </p>
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -147,7 +225,7 @@ export default function HistoryPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {history.map((log) => (
+                  {filtered.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-sm">
