@@ -14,6 +14,7 @@ import {
   Receipt,
   History,
   ArrowRight,
+  MessageCircle,
 } from 'lucide-react';
 
 interface Snapshot {
@@ -86,6 +87,13 @@ export default function ReportsHubPage() {
 
         {/* Reports list */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <ReportCard
+            href="/dashboard/whatsapp"
+            icon={<MessageCircle className="w-6 h-6" />}
+            title="WhatsApp Center ⭐"
+            desc="Send reminders manually via wa.me. Mark sent + filter remaining. Daily-use page."
+            color="emerald"
+          />
           <ReportCard
             href="/dashboard/daily-summary"
             icon={<Calendar className="w-6 h-6" />}

@@ -1,18 +1,36 @@
 /**
  * POST /api/send-reminder
  *
- * Server-side reminder dispatch. Reads the customer + their latest sale,
- * checks opt-out / pause / no-sales, writes a reminders row, and either:
- *   (a) calls AiSensy → updates row with wa_message_id (status='sent')
- *   (b) returns a wa.me fallback URL if AiSensy isn't configured (status='sent', send_method='manual_walink')
+ * Semi-automated reminder dispatch. We removed the direct WhatsApp Cloud API
+ * (AiSensy) integration to keep cost at zero — staff send via the WhatsApp
+ * app on their phone using a wa.me click-to-chat link, then the dashboard
+ * records the send in the `reminders` table for tracking.
  *
- * Body:    { customer_id: string, language?: 'en' | 'te' | 'hi' }
- * Returns: { ok: boolean, reminder_id?: string, fallback_url?: string, error?: string }
+ * This endpoint is kept as a server-side helper that:
+ *   1. Reads the customer + their latest sale from customer_next_reminder
+ *   2. Validates opt-out / pause state
+ *   3. Generates a wa.me URL with the appropriate message
+ *   4. (Optionally) inserts a reminders row when `mark_sent: true`
+ *   5. Returns the wa.me URL so the client can open it
+ *
+ * Body:    { customer_id: string, language?: 'en'|'te'|'hi', mark_sent?: boolean }
+ * Returns: { ok, reminder_id?, fallback_url, message_preview, error? }
+ *
+ * For finer client-side control, prefer the helpers in lib/whatsapp.ts:
+ *   - pickReminder()           → choose message + label
+ *   - generateWhatsAppUrl()    → build wa.me URL
+ *   - markReminderSent()       → insert reminders row
+ *   - undoReminderSent()       → delete it
  */
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendAiSensyTemplate, formatDestination, buildReminderParams } from '@/lib/aisensy';
-import { generateReminderMessage, generateWhatsAppUrl } from '@/lib/whatsapp';
+import {
+  pickReminder,
+  generateWhatsAppUrl,
+} from '@/lib/whatsapp';
+
+export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 type CustomerView = {
   customer_id: string;
@@ -21,15 +39,11 @@ type CustomerView = {
   preferred_language: 'en' | 'te' | 'hi';
   whatsapp_opt_out: boolean;
   reminders_paused_until: string | null;
-  status: string;
   last_sale_id: string | null;
   reminder_date: string | null;
   days_until_reminder: number | null;
-  reminder_trigger_date: string | null;
+  outstanding: number | null;
 };
-
-export const dynamic = 'force-dynamic';
-export const runtime = 'nodejs';
 
 function getServiceClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -39,7 +53,7 @@ function getServiceClient() {
 }
 
 export async function POST(request: Request) {
-  let body: { customer_id?: string; language?: 'en' | 'te' | 'hi' } = {};
+  let body: { customer_id?: string; language?: 'en' | 'te' | 'hi'; mark_sent?: boolean } = {};
   try {
     body = await request.json();
   } catch {
@@ -58,17 +72,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }
 
-  // 1. Read customer + latest sale via the view
-  const { data: custData, error: cErr } = await supabase
+  // Read customer + latest sale via the view
+  const { data: cust, error: cErr } = await supabase
     .from('customer_next_reminder')
     .select(
       'customer_id, phone, customer_name, preferred_language, whatsapp_opt_out, ' +
-      'reminders_paused_until, status, last_sale_id, reminder_date, ' +
-      'days_until_reminder, reminder_trigger_date',
+        'reminders_paused_until, last_sale_id, reminder_date, days_until_reminder, outstanding',
     )
     .eq('customer_id', customerId)
     .single<CustomerView>();
-  const cust = custData as CustomerView | null;
 
   if (cErr || !cust) {
     return NextResponse.json(
@@ -76,14 +88,10 @@ export async function POST(request: Request) {
       { status: 404 },
     );
   }
-
   if (cust.whatsapp_opt_out) {
     return NextResponse.json({ ok: false, error: 'Customer is opted out' }, { status: 409 });
   }
-  if (
-    cust.reminders_paused_until &&
-    new Date(cust.reminders_paused_until) >= new Date()
-  ) {
+  if (cust.reminders_paused_until && new Date(cust.reminders_paused_until) >= new Date()) {
     return NextResponse.json(
       { ok: false, error: `Reminders paused until ${cust.reminders_paused_until}` },
       { status: 409 },
@@ -91,109 +99,57 @@ export async function POST(request: Request) {
   }
 
   const language = body.language ?? cust.preferred_language ?? 'en';
-  const days = cust.days_until_reminder ?? 0;
 
-  // 2. Idempotency guard: prevent double-send within 5 minutes
-  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-  const { count: recentCount } = await supabase
-    .from('reminders')
-    .select('id', { count: 'exact', head: true })
-    .eq('customer_id', customerId)
-    .gte('created_at', fiveMinutesAgo)
-    .in('status', ['queued', 'sent', 'delivered', 'read']);
-  if ((recentCount ?? 0) > 0) {
+  const pick = pickReminder({
+    customerName: cust.customer_name,
+    outstanding: Number(cust.outstanding || 0),
+    daysUntilRefill: cust.days_until_reminder,
+    language,
+  });
+
+  if (!pick) {
     return NextResponse.json(
-      { ok: false, error: 'A reminder was already sent recently. Please wait 5 minutes.' },
-      { status: 429 },
+      { ok: false, error: 'Customer has no outstanding balance and no upcoming refill' },
+      { status: 409 },
     );
   }
 
-  // 3. Insert a queued reminder row
-  const { data: reminderRow, error: insErr } = await supabase
-    .from('reminders')
-    .insert({
-      customer_id: customerId,
-      sales_transaction_id: cust.last_sale_id,
-      scheduled_for: cust.reminder_trigger_date,
-      channel: 'whatsapp',
-      send_method: 'queued',
-      status: 'queued',
-      template_language: language,
-    })
-    .select()
-    .single();
+  const fallbackUrl = generateWhatsAppUrl(cust.phone, pick.message);
 
-  if (insErr || !reminderRow) {
-    return NextResponse.json(
-      { ok: false, error: insErr?.message || 'Could not create reminder' },
-      { status: 500 },
-    );
-  }
-
-  // 4. Try AiSensy if configured
-  const apiKey = process.env.AISENSY_API_KEY;
-  const campaignName =
-    (language === 'te' && process.env.AISENSY_CAMPAIGN_TE) ||
-    (language === 'hi' && process.env.AISENSY_CAMPAIGN_HI) ||
-    process.env.AISENSY_CAMPAIGN_EN ||
-    process.env.AISENSY_CAMPAIGN_NAME;
-
-  if (apiKey && campaignName) {
-    const result = await sendAiSensyTemplate({
-      apiKey,
-      campaignName,
-      destination: formatDestination(cust.phone),
-      userName: cust.customer_name,
-      templateParams: buildReminderParams({
-        customerName: cust.customer_name,
-        reminderDateISO: cust.reminder_date,
-      }),
-      source: `dashboard-${reminderRow.id}`,
-    });
-
-    const update: Record<string, any> = {
-      send_method: 'api_automated',
-      template_name: campaignName,
-      sent_at: new Date().toISOString(),
-    };
-
-    if (result.ok) {
-      update.status = 'sent';
-      update.wa_message_id = result.messageId ?? null;
-    } else {
-      update.status = 'failed';
-      update.failed_reason = result.error || 'AiSensy returned non-ok';
+  // Optionally insert a reminders row
+  let reminderId: string | null = null;
+  if (body.mark_sent) {
+    const { data: rem, error: insErr } = await supabase
+      .from('reminders')
+      .insert({
+        customer_id: customerId,
+        sales_transaction_id: cust.last_sale_id,
+        channel: 'whatsapp',
+        send_method: 'manual_walink',
+        status: 'sent',
+        template_name: pick.templateName,
+        template_language: language,
+        message_content: pick.message,
+        sent_at: new Date().toISOString(),
+        sent_by: 'staff',
+      })
+      .select('id')
+      .single();
+    if (insErr) {
+      return NextResponse.json(
+        { ok: false, error: insErr.message, fallback_url: fallbackUrl },
+        { status: 500 },
+      );
     }
-
-    await supabase.from('reminders').update(update).eq('id', reminderRow.id);
-
-    return NextResponse.json({
-      ok: result.ok,
-      reminder_id: reminderRow.id,
-      message_id: result.messageId,
-      error: result.ok ? undefined : update.failed_reason,
-    });
+    reminderId = rem?.id ?? null;
   }
-
-  // 5. Fallback: no AiSensy configured. Return a wa.me URL the client can open.
-  const message = generateReminderMessage(cust.customer_name, days, language);
-  const fallbackUrl = generateWhatsAppUrl(cust.phone, message);
-
-  await supabase
-    .from('reminders')
-    .update({
-      send_method: 'manual_walink',
-      status: 'sent',
-      sent_at: new Date().toISOString(),
-      message_content: message,
-    })
-    .eq('id', reminderRow.id);
 
   return NextResponse.json({
     ok: true,
-    reminder_id: reminderRow.id,
+    reminder_id: reminderId,
     fallback_url: fallbackUrl,
-    fallback_reason:
-      'AiSensy not configured — using wa.me click-to-chat. Open the URL to send.',
+    message_preview: pick.message,
+    reason_label: pick.reasonLabel,
+    kind: pick.kind,
   });
 }

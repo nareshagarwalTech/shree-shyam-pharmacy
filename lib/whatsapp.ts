@@ -1,4 +1,5 @@
 import { PHARMACY_INFO, WHATSAPP_TEMPLATES } from './constants';
+import { supabase } from './supabase';
 
 /**
  * Generate a WhatsApp click-to-chat URL.
@@ -119,6 +120,152 @@ Please clear it at your convenience — visit us or pay online.
 📞 ${PHARMACY_INFO.phone}
 
 Thank you! 🙏`;
+}
+
+// ============================================================================
+// Reminder type detection + message picker
+// ============================================================================
+
+export type ReminderKind = 'due' | 'refill' | 'combined';
+
+export interface ReminderPick {
+  kind: ReminderKind;
+  message: string;
+  templateName: string;     // for the reminders.template_name column
+  reasonLabel: string;      // for UI ("₹15,340 outstanding · refill 2 days overdue")
+}
+
+interface PickInput {
+  customerName: string;
+  outstanding: number;
+  daysUntilRefill: number | null;   // negative = overdue
+  language?: Lang;
+}
+
+/**
+ * Decide which type of reminder to send based on the customer's state.
+ * Outstanding > 0 takes priority since unpaid bills are more urgent
+ * than upcoming refill reminders.
+ */
+export function pickReminder(opts: PickInput): ReminderPick | null {
+  const lang = opts.language ?? 'en';
+  const owesMoney = opts.outstanding > 0;
+  const refillDue = opts.daysUntilRefill !== null && opts.daysUntilRefill <= 7;
+
+  if (!owesMoney && !refillDue) return null;
+
+  // Reason label assembled from both signals
+  const parts: string[] = [];
+  if (owesMoney) {
+    parts.push(`₹${Math.round(opts.outstanding).toLocaleString('en-IN')} outstanding`);
+  }
+  if (refillDue) {
+    const d = opts.daysUntilRefill!;
+    parts.push(
+      d < 0 ? `refill ${Math.abs(d)} day${Math.abs(d) === 1 ? '' : 's'} overdue` :
+      d === 0 ? 'refill due today' :
+      d === 1 ? 'refill due tomorrow' :
+      `refill in ${d} days`
+    );
+  }
+  const reasonLabel = parts.join(' · ');
+
+  // Outstanding wins — staff probably wants to collect money first
+  if (owesMoney) {
+    return {
+      kind: refillDue ? 'combined' : 'due',
+      message: generateDueMessage(opts.customerName, opts.outstanding, lang),
+      templateName: refillDue ? 'manual_combined_due_first' : 'manual_due',
+      reasonLabel,
+    };
+  }
+  // Pure refill reminder
+  return {
+    kind: 'refill',
+    message: generateReminderMessage(opts.customerName, opts.daysUntilRefill ?? 0, lang),
+    templateName: 'manual_refill',
+    reasonLabel,
+  };
+}
+
+// ============================================================================
+// Mark reminder as sent (semi-automated workflow)
+// ============================================================================
+
+export interface MarkSentArgs {
+  customerId: string;
+  salesTransactionId?: string | null;
+  templateName: string;
+  templateLanguage: Lang;
+  messageContent: string;
+  sentBy?: string;
+}
+
+export interface MarkSentResult {
+  ok: boolean;
+  reminderId?: string;
+  error?: string;
+}
+
+/**
+ * Insert a reminder row recording that staff manually sent a WhatsApp
+ * message via wa.me click-to-chat. No external API call — purely a
+ * tracking write so the dashboard can show "already sent today" state.
+ */
+export async function markReminderSent(args: MarkSentArgs): Promise<MarkSentResult> {
+  const { data, error } = await supabase
+    .from('reminders')
+    .insert({
+      customer_id:           args.customerId,
+      sales_transaction_id:  args.salesTransactionId ?? null,
+      channel:               'whatsapp',
+      send_method:           'manual_walink',
+      status:                'sent',
+      template_name:         args.templateName,
+      template_language:     args.templateLanguage,
+      message_content:       args.messageContent,
+      sent_at:               new Date().toISOString(),
+      sent_by:               args.sentBy ?? 'staff',
+    })
+    .select('id')
+    .single();
+
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, reminderId: data.id };
+}
+
+/** Undo a mark-sent — used by the toast undo link. */
+export async function undoReminderSent(reminderId: string): Promise<{ ok: boolean; error?: string }> {
+  const { error } = await supabase.from('reminders').delete().eq('id', reminderId);
+  if (error) return { ok: false, error: error.message };
+  return { ok: true };
+}
+
+/**
+ * Has this customer already had a reminder sent today (since midnight local)?
+ * Used for the "Hide already sent today" filter and to show a check on rows.
+ */
+export async function getRemindersSentToday(customerIds: string[]): Promise<Map<string, { id: string; sent_at: string }>> {
+  if (!customerIds.length) return new Map();
+  const todayMidnight = new Date();
+  todayMidnight.setHours(0, 0, 0, 0);
+
+  const { data } = await supabase
+    .from('reminders')
+    .select('id, customer_id, sent_at')
+    .in('customer_id', customerIds)
+    .eq('channel', 'whatsapp')
+    .in('status', ['sent', 'delivered', 'read'])
+    .gte('sent_at', todayMidnight.toISOString())
+    .order('sent_at', { ascending: false });
+
+  const map = new Map<string, { id: string; sent_at: string }>();
+  for (const r of data || []) {
+    if (!map.has(r.customer_id)) {
+      map.set(r.customer_id, { id: r.id, sent_at: r.sent_at });
+    }
+  }
+  return map;
 }
 
 /** Indian 10-digit (starts 6-9) or 12-digit with 91 prefix */

@@ -17,6 +17,7 @@ import {
   BarChart3,
   ChevronDown,
   TrendingUp,
+  MessageCircle,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -24,14 +25,15 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 
 const PRIMARY = [
-  { href: '/dashboard',                label: 'Reminders',  icon: LayoutDashboard },
+  { href: '/dashboard',                label: 'Home',       icon: LayoutDashboard },
   { href: '/dashboard/deliveries',     label: 'Deliveries', icon: Receipt },
+  { href: '/dashboard/whatsapp',       label: 'WhatsApp',   icon: MessageCircle },
   { href: '/dashboard/pending',        label: 'Pending',    icon: AlertTriangle },
-  { href: '/dashboard/customers',      label: 'Customers',  icon: Users },
   { href: '/dashboard/reports',        label: 'Reports',    icon: TrendingUp },
 ];
 
 const MORE = [
+  { href: '/dashboard/customers',       label: 'Customers',          icon: Users },
   { href: '/dashboard/daily-summary',   label: 'Daily Collection',   icon: BarChart3 },
   { href: '/dashboard/monthly-summary', label: 'Monthly Collection', icon: BarChart3 },
   { href: '/dashboard/aging',           label: 'Aging Report',       icon: AlertTriangle },
