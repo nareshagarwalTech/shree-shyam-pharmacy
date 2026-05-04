@@ -402,41 +402,42 @@ export default function WhatsAppCenterPage() {
                       </button>
                       {sent ? (
                         <>
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-sm font-medium rounded-lg">
-                            <CheckCircle className="w-4 h-4" />
-                            Sent at {lastSentLabel}
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-md">
+                            <CheckCircle className="w-3.5 h-3.5" />
+                            <span className="hidden sm:inline">Sent {lastSentLabel}</span>
+                            <span className="sm:hidden">Sent</span>
                           </span>
                           <button
                             onClick={() => undoMarkSent(r)}
-                            className="flex items-center gap-1 px-2 py-1.5 text-xs text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg"
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md"
+                            title="Undo mark sent"
                           >
                             <Undo2 className="w-3.5 h-3.5" />
-                            Undo
                           </button>
                         </>
                       ) : (
                         <>
                           <button
                             onClick={() => openWA(r)}
-                            className="flex items-center gap-1.5 px-3 py-2 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-lg text-sm"
+                            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 bg-[#25D366] hover:bg-[#20BD5A] text-white font-medium rounded-md text-sm"
                             title="Open WhatsApp with the message"
                           >
                             <MessageCircle className="w-4 h-4" />
-                            Open WhatsApp
+                            <span className="hidden sm:inline">Open</span>
                           </button>
                           <button
                             onClick={() => markSent(r)}
                             disabled={r.customer.whatsapp_opt_out}
-                            className="flex items-center gap-1.5 px-3 py-2 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent font-medium rounded-lg text-sm"
-                            title="Record that this reminder was sent"
+                            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 border border-emerald-500 text-emerald-700 hover:bg-emerald-50 disabled:border-gray-200 disabled:text-gray-400 disabled:hover:bg-transparent font-medium rounded-md text-sm"
+                            title="Mark reminder as sent"
                           >
                             <CheckCircle className="w-4 h-4" />
-                            Mark Sent
+                            <span className="hidden sm:inline">Sent</span>
                           </button>
                           <a
                             href={`tel:${r.customer.phone}`}
-                            className="p-2 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg"
-                            title="Call instead"
+                            className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-md"
+                            title="Call customer"
                           >
                             <Phone className="w-4 h-4" />
                           </a>

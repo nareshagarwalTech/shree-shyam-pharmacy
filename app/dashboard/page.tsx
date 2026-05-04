@@ -207,8 +207,8 @@ export default function DashboardPage() {
       <DashboardHeader />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Outstanding + quick action banner */}
-        <div className="mb-6 grid grid-cols-1 lg:grid-cols-3 gap-3">
+        {/* Outstanding + collection banner — New Delivery CTA moved into header */}
+        <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Link
             href="/dashboard/pending"
             className="group relative overflow-hidden rounded-xl border border-red-200 bg-gradient-to-br from-red-50 to-amber-50 p-4 hover:shadow-md transition-all"
@@ -220,25 +220,10 @@ export default function DashboardPage() {
               </div>
               <ArrowRight className="w-4 h-4 text-red-400 group-hover:translate-x-0.5 transition-transform" />
             </div>
-            <div className="text-3xl font-display font-bold text-red-700 leading-none">
+            <div className="text-2xl sm:text-3xl font-display font-bold text-red-700 leading-none">
               ₹{pendingTotal.amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
             </div>
-            <div className="text-sm text-red-600/70 mt-1">{pendingTotal.count} customers owe money</div>
-          </Link>
-
-          <Link
-            href="/dashboard/deliveries/new"
-            className="group flex items-center justify-between rounded-xl border-2 border-emerald-300 bg-emerald-50 p-4 hover:bg-emerald-100 transition-all"
-          >
-            <div>
-              <div className="flex items-center gap-2 text-emerald-700 mb-1">
-                <Receipt className="w-4 h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wider">Daily entry</span>
-              </div>
-              <div className="text-lg font-display font-bold text-emerald-800">+ New Delivery</div>
-              <div className="text-xs text-emerald-700/70 mt-0.5">Record bill + payment</div>
-            </div>
-            <Plus className="w-8 h-8 text-emerald-600 group-hover:scale-110 transition-transform" />
+            <div className="text-xs text-red-600/70 mt-1">{pendingTotal.count} customers owe money</div>
           </Link>
 
           <Link
@@ -248,10 +233,10 @@ export default function DashboardPage() {
             <div>
               <div className="flex items-center gap-2 text-cyan-700 mb-1">
                 <IndianRupee className="w-4 h-4" />
-                <span className="text-xs font-semibold uppercase tracking-wider">Today&apos;s collection</span>
+                <span className="text-xs font-semibold uppercase tracking-wider">Daily Collection</span>
               </div>
-              <div className="text-lg font-display font-bold text-cyan-800">View summary →</div>
-              <div className="text-xs text-cyan-700/70 mt-0.5">Cash, online, credit</div>
+              <div className="text-base sm:text-lg font-display font-bold text-cyan-800">View summary →</div>
+              <div className="text-xs text-cyan-700/70 mt-0.5">Cash, online, credit by date</div>
             </div>
             <ArrowRight className="w-5 h-5 text-cyan-500 group-hover:translate-x-0.5 transition-transform" />
           </Link>

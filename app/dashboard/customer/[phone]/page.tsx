@@ -281,29 +281,32 @@ export default function CustomerStatementPage() {
                   {customer.notes && <p className="text-sm text-gray-500 italic mt-1">📝 {customer.notes}</p>}
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                   <button
                     onClick={() => { setPaymentDefaults({}); setShowAddPayment(true); }}
-                    className="flex items-center gap-2 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg text-sm"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-md text-sm"
+                    title="Record a payment"
                   >
                     <PlusCircle className="w-4 h-4" />
-                    Record Payment
+                    <span className="hidden sm:inline">+ Payment</span>
                   </button>
                   <Link
                     href={`/dashboard/deliveries/new?customer=${customer.phone}`}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-medium rounded-lg text-sm"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-white border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-medium rounded-md text-sm"
+                    title="Add a new bill"
                   >
                     <Plus className="w-4 h-4" />
-                    New Bill
+                    <span className="hidden sm:inline">+ Bill</span>
                   </Link>
                   {Number(balance.outstanding) > 0 && (
                     <button
                       onClick={sendDueReminder}
                       disabled={customer.whatsapp_opt_out}
-                      className="flex items-center gap-2 px-3 py-2 bg-[#25D366] hover:bg-[#20BD5A] disabled:bg-gray-300 text-white font-medium rounded-lg text-sm"
+                      className="flex items-center gap-1.5 px-3 py-2 bg-[#25D366] hover:bg-[#20BD5A] disabled:bg-gray-300 text-white font-medium rounded-md text-sm"
+                      title="Send due reminder via WhatsApp"
                     >
                       <MessageCircle className="w-4 h-4" />
-                      WhatsApp
+                      <span className="hidden sm:inline">WhatsApp</span>
                     </button>
                   )}
                 </div>
