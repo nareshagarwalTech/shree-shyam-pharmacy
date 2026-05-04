@@ -47,6 +47,9 @@ export type PaymentMode = 'cash' | 'online' | 'credit' | null;
 // Migration 005 — payments table is the source of truth for received money
 export type PaymentChannel = 'cash' | 'online' | 'cheque' | 'card' | 'other';
 
+// Migration 006/007 — message templates
+export type TemplateKind = 'refill' | 'due' | 'marketing';
+
 export interface Payment {
   id: string;
   customer_id: string;

@@ -135,11 +135,11 @@ export interface ReminderPick {
   reasonLabel: string;      // for UI ("₹15,340 outstanding · refill 2 days overdue")
 }
 
-// Editable templates from migration 006
+// Editable templates from migration 006/007
 export interface MessageTemplate {
   id: string;
   slug: string;
-  kind: 'refill' | 'due';
+  kind: 'refill' | 'due' | 'marketing';
   language: Lang;
   label: string;
   body: string;

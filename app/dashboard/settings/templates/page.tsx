@@ -31,8 +31,18 @@ const PLACEHOLDERS = [
   { key: 'date',                desc: "Today's date" },
 ];
 
-const KIND_LABEL: Record<string, string> = { refill: 'Refill reminder', due: 'Outstanding due' };
+const KIND_LABEL: Record<string, string> = {
+  refill: 'Refill reminder',
+  due: 'Outstanding due',
+  marketing: 'Marketing / Offer',
+};
+const KIND_COLOR: Record<string, string> = {
+  refill: 'bg-blue-100 text-blue-700',
+  due: 'bg-amber-100 text-amber-700',
+  marketing: 'bg-purple-100 text-purple-700',
+};
 const LANG_LABEL: Record<string, string> = { en: 'English', te: 'Telugu', hi: 'Hindi' };
+const KIND_ORDER = ['refill', 'due', 'marketing'];
 
 interface DraftMap { [id: string]: string; }
 
@@ -161,9 +171,9 @@ export default function TemplatesPage() {
                   <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2">
                       <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-full ${
-                        t.kind === 'refill' ? 'bg-blue-100 text-blue-700' : 'bg-amber-100 text-amber-700'
+                        KIND_COLOR[t.kind] || 'bg-gray-100 text-gray-700'
                       }`}>
-                        {KIND_LABEL[t.kind]}
+                        {KIND_LABEL[t.kind] || t.kind}
                       </span>
                       <span className="px-2 py-0.5 text-[11px] font-semibold bg-gray-100 text-gray-700 rounded-full uppercase">
                         {LANG_LABEL[t.language] || t.language}

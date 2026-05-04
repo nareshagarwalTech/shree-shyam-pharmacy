@@ -19,6 +19,7 @@ import {
   TrendingUp,
   MessageCircle,
   MessageSquareText,
+  Megaphone,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -34,6 +35,7 @@ const PRIMARY = [
 ];
 
 const MORE = [
+  { href: '/dashboard/broadcast',          label: 'Broadcast Offers',   icon: Megaphone },
   { href: '/dashboard/customers',          label: 'Customers',          icon: Users },
   { href: '/dashboard/top-customers',      label: 'Top Customers',      icon: TrendingUp },
   { href: '/dashboard/daily-summary',      label: 'Daily Collection',   icon: BarChart3 },
