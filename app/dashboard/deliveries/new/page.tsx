@@ -1,9 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { supabase, CustomerBalance } from '@/lib/supabase';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
 import { isValidIndianPhone, formatPhoneDisplay } from '@/lib/whatsapp';
 import { todayISO } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
@@ -16,6 +16,7 @@ import {
   CheckCircle,
   Loader2,
   AlertTriangle,
+  Clock,
 } from 'lucide-react';
 
 type CustomerLite = {
@@ -27,10 +28,15 @@ type CustomerLite = {
 
 export default function NewDeliveryPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const presetPhone = searchParams.get('customer');
+
   const [allCustomers, setAllCustomers] = useState<CustomerLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [recentSaves, setRecentSaves] = useState<string[]>([]);
+  const [recentPicks, setRecentPicks] = useState<CustomerLite[]>([]);
+  const customerInputRef = useRef<HTMLInputElement>(null);
+  const billAmtRef = useRef<HTMLInputElement>(null);
 
   // Form state
   const [searchTerm, setSearchTerm] = useState('');
@@ -74,11 +80,49 @@ export default function NewDeliveryPage() {
 
   useEffect(() => { fetchCustomers(); }, [fetchCustomers]);
 
+  // Pre-pick customer from ?customer=PHONE query param
+  useEffect(() => {
+    if (!presetPhone || !allCustomers.length || picked) return;
+    const c = allCustomers.find((x) => x.phone === presetPhone);
+    if (c) {
+      setPicked(c);
+      setSearchTerm(c.name);
+      setTimeout(() => billAmtRef.current?.focus(), 50);
+    }
+  }, [presetPhone, allCustomers, picked]);
+
   // Refresh outstanding when customer is picked
   useEffect(() => {
     if (!picked) return;
     setOutstanding(picked.outstanding || 0);
   }, [picked]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Esc — reset form
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        reset();
+      }
+      // F2 — focus customer search
+      if (e.key === 'F2') {
+        e.preventDefault();
+        customerInputRef.current?.focus();
+        customerInputRef.current?.select();
+      }
+      // Ctrl/Cmd + Enter — Save & New
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        if (picked && billAmt > 0 && !saving) {
+          e.preventDefault();
+          save(true);
+        }
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [picked, billAmt, saving, billNo, deliveryDate, customerPays, mode, paymentDate, notes, outstanding]);
 
   // Filter suggestions
   const suggestions = useMemo(() => {
@@ -100,6 +144,12 @@ export default function NewDeliveryPage() {
     setPicked(c);
     setSearchTerm(c.name);
     setShowSuggestions(false);
+    setRecentPicks((prev) => {
+      const without = prev.filter((p) => p.phone !== c.phone);
+      return [c, ...without].slice(0, 6);
+    });
+    // jump to bill amount
+    setTimeout(() => billAmtRef.current?.focus(), 50);
   };
 
   const addNewCustomerInline = async () => {
@@ -179,10 +229,21 @@ export default function NewDeliveryPage() {
       setToast({ message: error.message, type: 'error' });
       return;
     }
-    setRecentSaves((p) => [`${picked.name} · ₹${billAmt} · ${mode || 'credit'}`, ...p].slice(0, 5));
+    // Add to recent picks so this customer is one click away on next entry
+    setRecentPicks((prev) => {
+      const updatedCust = { ...picked, outstanding: balanceLeft + (picked.outstanding || 0) - outstanding };
+      const without = prev.filter((p) => p.phone !== picked.phone);
+      return [updatedCust, ...without].slice(0, 6);
+    });
+
+    // Refresh master list so outstanding stays current
+    fetchCustomers();
+
     if (andNew) {
       reset();
-      setToast({ message: 'Saved. Ready for next.', type: 'success' });
+      setToast({ message: `Saved · ${picked.name} · ₹${billAmt}`, type: 'success' });
+      // jump back to customer search for the next entry
+      setTimeout(() => customerInputRef.current?.focus(), 80);
     } else {
       router.push('/dashboard/deliveries');
     }
@@ -211,9 +272,31 @@ export default function NewDeliveryPage() {
             {/* Customer picker */}
             <div className="relative">
               <label className="block text-sm font-medium text-gray-700 mb-1">Customer</label>
+
+              {recentPicks.length > 0 && !picked && (
+                <div className="mb-2 flex items-center gap-1.5 flex-wrap">
+                  <Clock className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="text-[11px] uppercase font-semibold text-gray-500 mr-1">Recent</span>
+                  {recentPicks.map((c) => (
+                    <button
+                      key={c.phone}
+                      type="button"
+                      onClick={() => pickCustomer(c)}
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-md"
+                    >
+                      {c.name}
+                      {c.outstanding! > 0 && (
+                        <span className="text-red-600">·₹{Math.round(c.outstanding!)}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
+                  ref={customerInputRef}
                   type="text"
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setShowSuggestions(true); setPicked(null); }}
@@ -222,6 +305,7 @@ export default function NewDeliveryPage() {
                   placeholder="Search name or phone…"
                   className="w-full pl-10 pr-32 py-2.5 rounded-lg border border-gray-200 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
                   disabled={loading}
+                  autoFocus
                 />
                 <button
                   type="button"
@@ -338,6 +422,7 @@ export default function NewDeliveryPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Bill Amt (₹)</label>
                 <input
+                  ref={billAmtRef}
                   type="number"
                   value={billAmt || ''}
                   onChange={(e) => setBillAmt(parseFloat(e.target.value) || 0)}
@@ -446,19 +531,14 @@ export default function NewDeliveryPage() {
           </div>
         </div>
 
-        {recentSaves.length > 0 && (
-          <div className="mt-4 bg-white rounded-xl border border-gray-100 p-4">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Just saved (this session)</h3>
-            <ul className="text-sm text-gray-700 space-y-1">
-              {recentSaves.map((s, i) => (
-                <li key={i} className="flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-emerald-500" />
-                  {s}
-                </li>
-              ))}
-            </ul>
+        <div className="mt-4 bg-white rounded-xl border border-gray-100 p-4">
+          <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Keyboard shortcuts</h3>
+          <div className="flex flex-wrap gap-3 text-xs text-gray-600">
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded font-mono">F2</kbd> Focus customer</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded font-mono">Ctrl/⌘ + Enter</kbd> Save &amp; New</span>
+            <span><kbd className="px-1.5 py-0.5 bg-gray-100 border rounded font-mono">Esc</kbd> Reset form</span>
           </div>
-        )}
+        </div>
       </main>
 
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}

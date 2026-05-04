@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   BarChart3,
   ChevronDown,
+  TrendingUp,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -23,18 +24,21 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from './AuthProvider';
 
 const PRIMARY = [
-  { href: '/dashboard',                label: 'Reminders', icon: LayoutDashboard },
+  { href: '/dashboard',                label: 'Reminders',  icon: LayoutDashboard },
   { href: '/dashboard/deliveries',     label: 'Deliveries', icon: Receipt },
   { href: '/dashboard/pending',        label: 'Pending',    icon: AlertTriangle },
   { href: '/dashboard/customers',      label: 'Customers',  icon: Users },
-  { href: '/dashboard/daily-summary',  label: 'Summary',    icon: BarChart3 },
+  { href: '/dashboard/reports',        label: 'Reports',    icon: TrendingUp },
 ];
 
 const MORE = [
-  { href: '/dashboard/groups',        label: 'Groups',       icon: Tags },
-  { href: '/dashboard/sales-upload',  label: 'Upload Sales', icon: Upload },
-  { href: '/dashboard/history',       label: 'WhatsApp Log', icon: History },
-  { href: '/',                        label: 'Public site',  icon: Home },
+  { href: '/dashboard/daily-summary',   label: 'Daily Collection',   icon: BarChart3 },
+  { href: '/dashboard/monthly-summary', label: 'Monthly Collection', icon: BarChart3 },
+  { href: '/dashboard/aging',           label: 'Aging Report',       icon: AlertTriangle },
+  { href: '/dashboard/groups',          label: 'Groups',             icon: Tags },
+  { href: '/dashboard/sales-upload',    label: 'Upload Sales',       icon: Upload },
+  { href: '/dashboard/history',         label: 'WhatsApp Log',       icon: History },
+  { href: '/',                          label: 'Public site',        icon: Home },
 ];
 
 export default function DashboardHeader() {

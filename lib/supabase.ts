@@ -92,15 +92,55 @@ export interface CustomerBalance {
   balance_status: 'PENDING' | 'CLEAR';
 }
 
+// Migration 004 — payment-centric daily summary
 export interface DailyCollection {
-  date: string;                    // ISO date
-  bills_delivered: number;
-  total_billed: number;
-  change_given: number;
+  date: string;                    // ISO date — payment_date
+  bills_paid: number;
   cash_received: number;
   online_received: number;
-  credit_given: number;
-  balance_left: number;
+  total_collected: number;
+  change_given: number;
+  billed_same_day: number;         // collected for today's deliveries
+  old_due_collected: number;       // collected for older outstanding bills
+}
+
+export interface MonthlyCollection {
+  month: string;                   // first-of-month ISO date
+  month_label: string;             // 'YYYY-MM'
+  bills_paid: number;
+  unique_customers: number;
+  cash_received: number;
+  online_received: number;
+  total_collected: number;
+  change_given: number;
+  avg_per_bill: number;
+}
+
+export interface CustomerAging {
+  customer_id: string;
+  customer_name: string;
+  phone: string;
+  oldest_age_days: number;
+  oldest_unpaid_date: string | null;
+  outstanding: number;
+  bucket_0_30: number;
+  bucket_31_60: number;
+  bucket_61_90: number;
+  bucket_90_plus: number;
+  unpaid_bill_count: number;
+}
+
+export interface TopCustomer {
+  customer_id: string;
+  customer_name: string;
+  phone: string;
+  bill_count: number;
+  total_billed: number;
+  total_collected: number;
+  outstanding: number;
+  last_purchase_date: string | null;
+  last_payment_date: string | null;
+  avg_days_to_pay: number | null;
 }
 
 export interface Reminder {

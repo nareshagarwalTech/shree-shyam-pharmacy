@@ -20,6 +20,9 @@ import {
   MapPin,
   Calendar,
   CheckCircle,
+  Clock,
+  TrendingUp,
+  Plus,
 } from 'lucide-react';
 
 export default function CustomerStatementPage() {
@@ -52,9 +55,55 @@ export default function CustomerStatementPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
-  const totalChange = useMemo(
-    () => bills.reduce((s, b) => s + Number(b.change_given || 0), 0),
-    [bills],
+  // Stats: change-given, oldest unpaid, avg-days-to-pay, monthly aggregates
+  const stats = useMemo(() => {
+    let totalChange = 0;
+    let oldestUnpaidDate: string | null = null;
+    const paidWithDates = bills.filter((b) => b.payment_date && b.delivery_date && Number(b.customer_paid || 0) > 0);
+    let avgDaysToPay: number | null = null;
+    if (paidWithDates.length > 0) {
+      const days = paidWithDates.map((b) => {
+        const d1 = new Date(b.delivery_date!).getTime();
+        const d2 = new Date(b.payment_date!).getTime();
+        return Math.max(0, Math.round((d2 - d1) / 86400000));
+      });
+      avgDaysToPay = Math.round(days.reduce((s, x) => s + x, 0) / days.length);
+    }
+    for (const b of bills) {
+      totalChange += Number(b.change_given || 0);
+      const balLeft = Number(b.net_amount || 0) - Number(b.customer_paid || 0);
+      if (balLeft > 0 && b.delivery_date) {
+        if (!oldestUnpaidDate || b.delivery_date < oldestUnpaidDate) {
+          oldestUnpaidDate = b.delivery_date;
+        }
+      }
+    }
+    const oldestAgeDays = oldestUnpaidDate
+      ? Math.round((Date.now() - new Date(oldestUnpaidDate).getTime()) / 86400000)
+      : null;
+    return { totalChange, oldestUnpaidDate, oldestAgeDays, avgDaysToPay };
+  }, [bills]);
+
+  // Per-month aggregation for chart
+  const monthly = useMemo(() => {
+    const m = new Map<string, { billed: number; paid: number }>();
+    for (const b of bills) {
+      const key = (b.delivery_date || b.feed_date)?.slice(0, 7);
+      if (!key) continue;
+      const cur = m.get(key) || { billed: 0, paid: 0 };
+      cur.billed += Number(b.net_amount || 0);
+      cur.paid += Number(b.customer_paid || 0);
+      m.set(key, cur);
+    }
+    return Array.from(m.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .slice(-12)
+      .map(([key, v]) => ({ month: key, ...v }));
+  }, [bills]);
+
+  const monthlyMax = useMemo(
+    () => Math.max(1, ...monthly.map((m) => Math.max(m.billed, m.paid))),
+    [monthly],
   );
 
   const sendDueReminder = () => {
@@ -99,7 +148,7 @@ export default function CustomerStatementPage() {
           </div>
         ) : (
           <>
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-6">
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-4">
               <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                 <div>
                   <h1 className="text-2xl font-display font-bold text-gray-900">{balance.customer_name}</h1>
@@ -117,6 +166,13 @@ export default function CustomerStatementPage() {
                 </div>
 
                 <div className="flex items-center gap-2">
+                  <Link
+                    href={`/dashboard/deliveries/new?customer=${balance.phone}`}
+                    className="flex items-center gap-2 px-4 py-2 bg-white border border-emerald-500 text-emerald-700 hover:bg-emerald-50 font-medium rounded-lg"
+                  >
+                    <Plus className="w-4 h-4" />
+                    New Bill
+                  </Link>
                   {Number(balance.outstanding) > 0 && (
                     <button
                       onClick={sendDueReminder}
@@ -124,7 +180,7 @@ export default function CustomerStatementPage() {
                       className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-300 text-white font-medium rounded-lg"
                     >
                       <MessageCircle className="w-4 h-4" />
-                      Send Due Reminder
+                      Send Reminder
                     </button>
                   )}
                 </div>
@@ -140,13 +196,64 @@ export default function CustomerStatementPage() {
                   highlight={Number(balance.outstanding) > 0 ? 'red' : 'emerald'}
                 />
               </div>
-
-              {totalChange > 0 && (
-                <div className="text-xs text-gray-500 mt-3">
-                  Total change given to delivery boy across all bills: ₹{totalChange.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                </div>
-              )}
             </div>
+
+            {/* Insight tiles */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+              <Insight
+                icon={<Clock className="w-5 h-5" />}
+                label="Oldest unpaid"
+                value={stats.oldestAgeDays != null ? `${stats.oldestAgeDays} days` : '—'}
+                sub={stats.oldestUnpaidDate ? formatDate(stats.oldestUnpaidDate) : 'all clear'}
+                color={stats.oldestAgeDays != null && stats.oldestAgeDays > 60 ? 'red' : stats.oldestAgeDays != null ? 'amber' : 'emerald'}
+              />
+              <Insight
+                icon={<TrendingUp className="w-5 h-5" />}
+                label="Avg days to pay"
+                value={stats.avgDaysToPay != null ? `${stats.avgDaysToPay} days` : '—'}
+                sub={`across ${bills.filter(b => b.payment_date && b.delivery_date).length} settled bills`}
+                color={stats.avgDaysToPay != null && stats.avgDaysToPay <= 7 ? 'emerald' : 'amber'}
+              />
+              <Insight
+                icon={<Receipt className="w-5 h-5" />}
+                label="Last visit"
+                value={balance.last_delivery_date ? formatDate(balance.last_delivery_date) : '—'}
+                sub={balance.last_payment_date ? `last paid ${formatDate(balance.last_payment_date)}` : 'no payments yet'}
+                color="blue"
+              />
+            </div>
+
+            {/* Monthly trend chart */}
+            {monthly.length > 0 && (
+              <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 mb-6">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Monthly Billed vs Paid</h3>
+                <div className="flex items-end gap-3 h-40">
+                  {monthly.map((m) => {
+                    const billedH = (m.billed / monthlyMax) * 100;
+                    const paidH = (m.paid / monthlyMax) * 100;
+                    return (
+                      <div
+                        key={m.month}
+                        className="flex-1 flex flex-col items-center min-w-0 group"
+                        title={`${m.month}\nBilled: ₹${m.billed.toLocaleString('en-IN')}\nPaid: ₹${m.paid.toLocaleString('en-IN')}`}
+                      >
+                        <div className="w-full flex items-end justify-center gap-1 flex-1">
+                          <div className="bg-blue-400 w-1/2 rounded-t" style={{ height: `${billedH}%`, minHeight: m.billed > 0 ? 2 : 0 }} />
+                          <div className="bg-emerald-500 w-1/2 rounded-t" style={{ height: `${paidH}%`, minHeight: m.paid > 0 ? 2 : 0 }} />
+                        </div>
+                        <div className="text-[10px] text-gray-500 mt-1 truncate w-full text-center">
+                          {m.month.slice(2)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-3 mt-2 text-xs text-gray-600">
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-blue-400" /> Billed</span>
+                  <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-emerald-500" /> Paid</span>
+                </div>
+              </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
@@ -154,6 +261,11 @@ export default function CustomerStatementPage() {
                   <Receipt className="w-5 h-5 text-emerald-600" />
                   Bill History ({bills.length})
                 </h2>
+                {stats.totalChange > 0 && (
+                  <span className="text-xs text-gray-500">
+                    Lifetime change handed back: ₹{stats.totalChange.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                  </span>
+                )}
               </div>
 
               {bills.length === 0 ? (
@@ -179,10 +291,16 @@ export default function CustomerStatementPage() {
                     <tbody className="divide-y divide-gray-100">
                       {bills.map((b) => {
                         const balanceLeft = Number(b.net_amount || 0) - Number(b.customer_paid || 0);
+                        const ageDays = b.delivery_date
+                          ? Math.round((Date.now() - new Date(b.delivery_date).getTime()) / 86400000)
+                          : null;
                         return (
                           <tr key={b.id} className="hover:bg-gray-50">
                             <td className="px-4 py-3 text-sm text-gray-900">
                               {b.delivery_date ? formatDate(b.delivery_date) : '—'}
+                              {balanceLeft > 0 && ageDays != null && ageDays > 30 && (
+                                <div className="text-[10px] text-amber-600">{ageDays} days old</div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                               {b.bill_no_label || b.feed_no}
@@ -258,6 +376,28 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
     <div className="rounded-lg bg-gray-50 border border-gray-100 p-3">
       <div className="text-xs font-medium text-gray-500">{label}</div>
       <div className={`text-xl font-display font-bold mt-0.5 ${cls}`}>{value}</div>
+    </div>
+  );
+}
+
+function Insight({ icon, label, value, sub, color }: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  sub: string;
+  color: 'red' | 'amber' | 'emerald' | 'blue';
+}) {
+  const map: Record<string, string> = {
+    red:     'bg-red-50 border-red-200 text-red-700',
+    amber:   'bg-amber-50 border-amber-200 text-amber-700',
+    emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
+    blue:    'bg-blue-50 border-blue-200 text-blue-700',
+  };
+  return (
+    <div className={`rounded-xl border p-4 ${map[color]}`}>
+      <div className="flex items-center gap-2 text-xs font-medium opacity-70">{icon}{label}</div>
+      <div className="text-2xl font-display font-bold mt-1">{value}</div>
+      <div className="text-xs opacity-70 mt-1">{sub}</div>
     </div>
   );
 }
