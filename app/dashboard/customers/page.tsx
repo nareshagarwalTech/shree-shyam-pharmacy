@@ -55,7 +55,7 @@ export default function CustomersPage() {
       out = out.filter(
         (c) =>
           c.name.toLowerCase().includes(q) ||
-          c.phone.includes(q.replace(/\D/g, '')),
+          (/\d/.test(q) && c.phone.includes(q.replace(/\D/g, ''))),
       );
     }
     if (groupFilter !== 'all') {

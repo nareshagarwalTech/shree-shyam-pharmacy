@@ -99,7 +99,7 @@ export default function BroadcastPage() {
     if (recipientSearch) {
       const q = recipientSearch.toLowerCase().trim();
       out = out.filter(
-        (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\D/g, '')),
+        (c) => c.name.toLowerCase().includes(q) || (/\d/.test(q) && c.phone.includes(q.replace(/\D/g, ''))),
       );
     }
     return out;

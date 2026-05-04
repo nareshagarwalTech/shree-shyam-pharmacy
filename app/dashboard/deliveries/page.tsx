@@ -73,7 +73,7 @@ export default function DeliveriesPage() {
       out = out.filter(
         (r) =>
           r.customer_name?.toLowerCase().includes(q) ||
-          r.customer_phone.includes(q.replace(/\D/g, '')) ||
+          (/\d/.test(q) && r.customer_phone.includes(q.replace(/\D/g, ''))) ||
           (r.bill_no_label || r.feed_no).toLowerCase().includes(q),
       );
     }

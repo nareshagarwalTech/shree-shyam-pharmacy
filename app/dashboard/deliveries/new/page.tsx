@@ -130,7 +130,7 @@ export default function NewDeliveryPage() {
     const q = searchTerm.toLowerCase().trim();
     return allCustomers
       .filter(
-        (c) => c.name.toLowerCase().includes(q) || c.phone.includes(q.replace(/\D/g, '')),
+        (c) => c.name.toLowerCase().includes(q) || (/\d/.test(q) && c.phone.includes(q.replace(/\D/g, ''))),
       )
       .slice(0, 8);
   }, [allCustomers, searchTerm]);

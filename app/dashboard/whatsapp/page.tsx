@@ -130,7 +130,7 @@ export default function WhatsAppCenterPage() {
       out = out.filter(
         (r) =>
           r.customer.customer_name.toLowerCase().includes(q) ||
-          r.customer.phone.includes(q.replace(/\D/g, '')),
+          (/\d/.test(q) && r.customer.phone.includes(q.replace(/\D/g, ''))),
       );
     }
     if (filter === 'due') {

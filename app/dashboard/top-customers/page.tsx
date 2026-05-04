@@ -39,7 +39,7 @@ export default function TopCustomersPage() {
     return rows.filter(
       (r) =>
         r.customer_name.toLowerCase().includes(q) ||
-        r.phone.includes(q.replace(/\D/g, '')),
+        (/\d/.test(q) && r.phone.includes(q.replace(/\D/g, ''))),
     );
   }, [rows, search]);
 

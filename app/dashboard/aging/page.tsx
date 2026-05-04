@@ -46,7 +46,7 @@ export default function AgingPage() {
       out = out.filter(
         (r) =>
           r.customer_name.toLowerCase().includes(q) ||
-          r.phone.includes(q.replace(/\D/g, '')),
+          (/\d/.test(q) && r.phone.includes(q.replace(/\D/g, ''))),
       );
     }
     if (bucketFilter === '0-30')   out = out.filter((r) => Number(r.bucket_0_30 || 0) > 0);

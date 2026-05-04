@@ -86,7 +86,7 @@ export default function HistoryPage() {
       out = out.filter(
         (h) =>
           h.customer_name.toLowerCase().includes(q) ||
-          h.phone.includes(q.replace(/\D/g, '')),
+          (/\d/.test(q) && h.phone.includes(q.replace(/\D/g, ''))),
       );
     }
     if (statusFilter !== 'all') out = out.filter((h) => h.status === statusFilter);

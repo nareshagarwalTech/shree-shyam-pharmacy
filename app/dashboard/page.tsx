@@ -82,7 +82,7 @@ export default function DashboardPage() {
       out = out.filter(
         (r) =>
           r.customer_name.toLowerCase().includes(q) ||
-          r.phone.includes(q.replace(/\D/g, '')) ||
+          (/\d/.test(q) && r.phone.includes(q.replace(/\D/g, ''))) ||
           r.last_feed_no?.toLowerCase().includes(q),
       );
     }
