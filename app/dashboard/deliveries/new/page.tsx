@@ -220,15 +220,39 @@ export default function NewDeliveryPage() {
       match_confidence:  'exact',
     };
 
-    const { error } = await supabase.from('sales_transactions').upsert(payload, {
-      onConflict: 'feed_no', ignoreDuplicates: false,
-    });
-    setSaving(false);
+    const { data: savedSale, error } = await supabase
+      .from('sales_transactions')
+      .upsert(payload, { onConflict: 'feed_no', ignoreDuplicates: false })
+      .select('id')
+      .single();
 
     if (error) {
+      setSaving(false);
       setToast({ message: error.message, type: 'error' });
       return;
     }
+
+    // If customer paid something, also insert a payment row (the new partial-
+    // payment-aware model). The payment amount = customer_paid - change_given,
+    // i.e. the net cash actually retained against the bill.
+    const netReceived = customerPays - change;
+    if (netReceived > 0 && mode && savedSale?.id) {
+      const { error: payErr } = await supabase.from('payments').insert({
+        customer_id: picked.id,
+        sales_transaction_id: savedSale.id,
+        amount: netReceived,
+        mode,
+        payment_date: paymentDate,
+        notes: notes.trim() || null,
+      });
+      if (payErr) {
+        setSaving(false);
+        setToast({ message: `Bill saved but payment failed: ${payErr.message}`, type: 'error' });
+        return;
+      }
+    }
+
+    setSaving(false);
     // Add to recent picks so this customer is one click away on next entry
     setRecentPicks((prev) => {
       const updatedCust = { ...picked, outstanding: balanceLeft + (picked.outstanding || 0) - outstanding };

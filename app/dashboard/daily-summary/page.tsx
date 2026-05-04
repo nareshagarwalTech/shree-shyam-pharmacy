@@ -38,7 +38,7 @@ export default function DailyCollectionPage() {
   useEffect(() => { fetch(); }, [fetch]);
 
   const totals = useMemo(() => ({
-    bills: rows.reduce((s, r) => s + Number(r.bills_paid || 0), 0),
+    bills: rows.reduce((s, r) => s + Number(r.payment_count || 0), 0),
     cash: rows.reduce((s, r) => s + Number(r.cash_received || 0), 0),
     online: rows.reduce((s, r) => s + Number(r.online_received || 0), 0),
     total: rows.reduce((s, r) => s + Number(r.total_collected || 0), 0),
@@ -72,7 +72,7 @@ export default function DailyCollectionPage() {
     const headers = ['Date', 'Bills Paid', 'Cash', 'Online', 'Total', 'Change', 'Same-day', 'Old-due'];
     const lines = [headers.join(',')];
     for (const r of rows) {
-      lines.push([r.date, r.bills_paid, r.cash_received, r.online_received, r.total_collected, r.change_given, r.billed_same_day, r.old_due_collected].join(','));
+      lines.push([r.date, r.payment_count, r.cash_received, r.online_received, r.total_collected, r.change_given, r.billed_same_day, r.old_due_collected].join(','));
     }
     const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
     const a = document.createElement('a');
@@ -255,7 +255,7 @@ export default function DailyCollectionPage() {
                   {rows.map((r) => (
                     <tr key={r.date} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-sm font-medium text-gray-900">{formatDate(r.date)}</td>
-                      <td className="px-4 py-3 text-right text-sm text-gray-700">{r.bills_paid}</td>
+                      <td className="px-4 py-3 text-right text-sm text-gray-700">{r.payment_count}</td>
                       <td className="px-4 py-3 text-right text-sm text-emerald-700">
                         ₹{Number(r.cash_received).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                       </td>

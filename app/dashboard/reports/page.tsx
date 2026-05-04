@@ -48,9 +48,9 @@ export default function ReportsHubPage() {
         outstandingTotal: (pending.data || []).reduce((s: number, r: any) => s + Number(r.outstanding || 0), 0),
         pendingCustomers: (pending.data || []).length,
         todayCollected: Number(today.data?.total_collected || 0),
-        todayBills: Number(today.data?.bills_paid || 0),
+        todayBills: Number(today.data?.payment_count || 0),
         thisMonthCollected: Number(monthRow?.total_collected || 0),
-        thisMonthBills: Number(monthRow?.bills_paid || 0),
+        thisMonthBills: Number(monthRow?.payment_count || 0),
         totalCustomers: custCount.count || 0,
         totalBills: salesCount.count || 0,
       });
@@ -135,6 +135,13 @@ export default function ReportsHubPage() {
             title="Customer Master"
             desc="332+ customers with groups, opt-out, language preferences."
             color="indigo"
+          />
+          <ReportCard
+            href="/dashboard/top-customers"
+            icon={<TrendingUp className="w-6 h-6" />}
+            title="Top Customers"
+            desc="Ranked by lifetime value. Sort by billed / collected / outstanding / visits."
+            color="amber"
           />
           <ReportCard
             href="/dashboard/history"
