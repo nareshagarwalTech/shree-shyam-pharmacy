@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase, SalesTransaction, Payment, PaymentChannel } from '@/lib/supabase';
 import { todayISO, formatDate } from '@/lib/utils';
 import { formatPhoneDisplay } from '@/lib/whatsapp';
+import useEscapeKey from '@/lib/useEscapeKey';
 import {
   X,
   Loader2,
@@ -70,6 +71,9 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+  // Don't close while a destructive confirm() is up — only when at the
+  // outer level (no draft in progress)
+  useEscapeKey(onClose, !adding && !editingId);
 
   // Fetch canonical customer info on mount (covers cases where the parent
   // didn't pre-attach customer_name to the bill row)

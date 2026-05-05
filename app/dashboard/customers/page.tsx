@@ -13,7 +13,6 @@ import {
   ChevronUp,
   Trash2,
   Plus,
-  Pencil,
   Ban,
   PlayCircle,
   PauseCircle,
@@ -137,7 +136,8 @@ export default function CustomersPage() {
               className="shrink-0 flex items-center gap-2 px-3 sm:px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg text-sm"
             >
               <Plus className="w-4 h-4" />
-              Add
+              <span className="hidden sm:inline">Add Customer</span>
+              <span className="sm:hidden">Add</span>
             </button>
           </div>
 

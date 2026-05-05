@@ -90,7 +90,7 @@ export default function ReportsHubPage() {
           <ReportCard
             href="/dashboard/whatsapp"
             icon={<MessageCircle className="w-6 h-6" />}
-            title="WhatsApp Center ⭐"
+            title="WhatsApp Center"
             desc="Send reminders manually via wa.me. Mark sent + filter remaining. Daily-use page."
             color="emerald"
           />
@@ -132,8 +132,8 @@ export default function ReportsHubPage() {
           <ReportCard
             href="/dashboard/customers"
             icon={<Users className="w-6 h-6" />}
-            title="Customer Master"
-            desc="332+ customers with groups, opt-out, language preferences."
+            title="All Customers"
+            desc={snap ? `${snap.totalCustomers} customers — manage groups, opt-out, language.` : 'Manage groups, opt-out, language preferences.'}
             color="indigo"
           />
           <ReportCard

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { supabase, Payment, PaymentChannel, SalesTransaction } from '@/lib/supabase';
 import { todayISO, formatDate } from '@/lib/utils';
+import useEscapeKey from '@/lib/useEscapeKey';
 import { X, Loader2, IndianRupee, AlertCircle } from 'lucide-react';
 
 interface Props {
@@ -47,6 +48,7 @@ export default function PaymentModal({
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+  useEscapeKey(onClose, !saving);
 
   const projectedOutstanding = isEdit
     ? outstandingBefore + (existing?.amount ?? 0) - amount

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import useEscapeKey from '@/lib/useEscapeKey';
 import { supabase, Customer } from '@/lib/supabase';
 import { isValidIndianPhone } from '@/lib/whatsapp';
 import { X, Loader2, AlertTriangle } from 'lucide-react';
@@ -22,6 +23,8 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
   const [notes, setNotes] = useState(customer.notes || '');
   const [saving, setSaving] = useState(false);
   const [phoneChanged, setPhoneChanged] = useState(false);
+
+  useEscapeKey(onClose, !saving);
 
   const validate = () => {
     if (!name.trim()) return 'Name required';

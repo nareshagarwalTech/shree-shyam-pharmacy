@@ -47,12 +47,15 @@ Create PNG files from the SVG in these sizes:
 
 Edit `lib/constants.ts` and `app/(public)/page.tsx`
 
-### 4. Update Password
+### 4. Set the dashboard password
 
-Edit `components/AuthProvider.tsx`:
-```typescript
-const APP_PASSWORD = 'YourSecurePassword123';
-```
+The password is checked **server-side** in `/api/login` so it is not in
+the JS bundle. Set it as an environment variable:
+
+- **Local dev:** add `APP_PASSWORD=YourSecurePassword123` to `.env.local`
+- **Vercel:** Project → Settings → Environment Variables → add `APP_PASSWORD`
+
+Restart the dev server (or redeploy) after changing it.
 
 ### 5. Deploy
 

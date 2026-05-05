@@ -12,24 +12,26 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Small delay for UX
-    setTimeout(() => {
-      const success = login(password);
+    try {
+      const success = await login(password);
       if (!success) {
         setError('Incorrect password. Please try again.');
         setPassword('');
       }
+    } catch (err: any) {
+      setError(err?.message || 'Login failed. Try again or contact admin.');
+    } finally {
       setIsLoading(false);
-    }, 500);
+    }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-amber-50 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-4">
       <div className="w-full max-w-md">
         {/* Logo & Title */}
         <div className="text-center mb-8">

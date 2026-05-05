@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import useEscapeKey from '@/lib/useEscapeKey';
 import { supabase, Group } from '@/lib/supabase';
 import { isValidIndianPhone } from '@/lib/whatsapp';
 import { X, Loader2, CheckCircle2 } from 'lucide-react';
@@ -14,6 +15,7 @@ interface Props {
 export default function AddCustomerModal({ groups, onClose, onSuccess }: Props) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  useEscapeKey(onClose, !loading);
 
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');

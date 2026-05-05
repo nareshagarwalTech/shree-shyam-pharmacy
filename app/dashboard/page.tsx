@@ -122,14 +122,6 @@ export default function DashboardPage() {
         return;
       }
 
-      // Direct API send succeeded
-      if (json.message_id) {
-        setToast({
-          message: `Sent via WhatsApp API ✓ (${json.message_id.slice(-8)})`,
-          type: 'success',
-        });
-      }
-
       // wa.me fallback — open the prefilled chat
       if (json.fallback_url) {
         window.open(json.fallback_url, '_blank', 'noopener,noreferrer');

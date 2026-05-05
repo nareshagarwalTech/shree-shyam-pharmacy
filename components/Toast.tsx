@@ -23,12 +23,12 @@ export default function Toast({ message, type, onClose, duration = 4000, action 
       <div className={`
         flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg
         ${type === 'success'
-          ? 'bg-green-50 border border-green-200 text-green-800'
+          ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
           : 'bg-red-50 border border-red-200 text-red-800'
         }
       `}>
         {type === 'success' ? (
-          <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+          <CheckCircle className="w-5 h-5 text-emerald-600 flex-shrink-0" />
         ) : (
           <XCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
         )}
@@ -38,7 +38,7 @@ export default function Toast({ message, type, onClose, duration = 4000, action 
             onClick={action.onClick}
             className={`px-3 py-1 text-sm font-semibold rounded-lg transition-colors ${
               type === 'success'
-                ? 'text-green-700 hover:bg-green-100'
+                ? 'text-emerald-700 hover:bg-emerald-100'
                 : 'text-red-700 hover:bg-red-100'
             }`}
           >

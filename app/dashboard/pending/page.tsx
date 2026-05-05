@@ -280,7 +280,7 @@ export default function PendingPage() {
                         <button
                           onClick={() => markPaid(r, 'online')}
                           disabled={markingPaid === r.customer_id}
-                          className="px-2.5 py-1.5 text-xs rounded-md text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold"
+                          className="px-2.5 py-1.5 text-xs rounded-md text-cyan-700 bg-cyan-50 hover:bg-cyan-100 font-semibold"
                         >
                           Online
                         </button>
@@ -374,7 +374,7 @@ export default function PendingPage() {
                           <button
                             onClick={() => markPaid(r, 'online')}
                             disabled={markingPaid === r.customer_id}
-                            className="px-2 py-1 text-xs rounded-lg text-blue-700 bg-blue-50 hover:bg-blue-100 font-semibold"
+                            className="px-2 py-1 text-xs rounded-lg text-cyan-700 bg-cyan-50 hover:bg-cyan-100 font-semibold"
                             title="Mark all bills paid online"
                           >
                             Online

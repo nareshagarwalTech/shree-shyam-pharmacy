@@ -487,7 +487,7 @@ export default function NewDeliveryPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className={`rounded-lg border p-3 ${change > 0 ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-gray-200 bg-gray-50 text-gray-500'}`}>
-                <div className="text-xs">Change to give boy</div>
+                <div className="text-xs">Change to return</div>
                 <div className="text-2xl font-display font-bold">₹{change.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
               </div>
               <div className={`rounded-lg border p-3 ${balanceLeft > 0 ? 'border-red-200 bg-red-50 text-red-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'}`}>
