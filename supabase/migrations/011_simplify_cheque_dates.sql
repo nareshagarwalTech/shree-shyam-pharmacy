@@ -25,15 +25,37 @@ DROP VIEW IF EXISTS cheque_party_summary    CASCADE;
 DROP VIEW IF EXISTS cheque_summary          CASCADE;
 
 -- ---------------------------------------------------------------------------
--- 1. Backfill deposit_date from clearance_date where missing
+-- 1. Backfill deposit_date in two passes so the new CHECK constraint is met
+--    a) prefer the existing clearance_date if we have one
+--    b) for any row that's still missing one, fall back to issue_date so the
+--       row stays valid (the cheque must have been deposited at some point;
+--       issue_date is an honest lower bound when the actual date is unknown)
 -- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+  -- Pass (a) only runs if clearance_date still exists on the table
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'cheques' AND column_name = 'clearance_date'
+  ) THEN
+    EXECUTE $sql$
+      UPDATE cheques
+         SET deposit_date = clearance_date
+       WHERE deposit_date IS NULL
+         AND clearance_date IS NOT NULL
+    $sql$;
+  END IF;
+END $$;
+
+-- Pass (b): cleared / deposited / bounced rows that still have a NULL
+-- deposit_date get the issue_date as the deposit_date.
 UPDATE cheques
-   SET deposit_date = clearance_date
+   SET deposit_date = issue_date
  WHERE deposit_date IS NULL
-   AND clearance_date IS NOT NULL;
+   AND status IN ('deposited', 'cleared', 'bounced');
 
 -- ---------------------------------------------------------------------------
--- 2. Drop clearance_date column
+-- 2. Drop clearance_date column (idempotent)
 -- ---------------------------------------------------------------------------
 ALTER TABLE cheques DROP COLUMN IF EXISTS clearance_date;
 
