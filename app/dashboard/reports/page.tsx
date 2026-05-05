@@ -15,6 +15,7 @@ import {
   History,
   ArrowRight,
   MessageCircle,
+  Wallet,
 } from 'lucide-react';
 
 interface Snapshot {
@@ -149,6 +150,13 @@ export default function ReportsHubPage() {
             title="WhatsApp Log"
             desc="Every reminder sent. Delivery / read status. Failed sends."
             color="purple"
+          />
+          <ReportCard
+            href="/dashboard/cheques"
+            icon={<Wallet className="w-6 h-6" />}
+            title="Cheques"
+            desc="Cheques + online transfers issued to vendors. Track pending, cleared, bounced."
+            color="emerald"
           />
         </div>
 

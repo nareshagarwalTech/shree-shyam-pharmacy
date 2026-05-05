@@ -251,3 +251,98 @@ export interface ImportBatch {
   notes: string | null;
   created_at: string;
 }
+
+// ---------------------------------------------------------------------------
+// Cheques module — migration 010
+// ---------------------------------------------------------------------------
+
+export interface Bank {
+  id: string;
+  name: string;
+  short_name: string | null;
+  account_no: string | null;
+  is_default: boolean;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PartyCategory = 'pharma' | 'staff' | 'service' | 'utility' | 'other';
+
+export interface Party {
+  id: string;
+  name: string;
+  short_name: string | null;
+  category: PartyCategory;
+  contact_phone: string | null;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChequeStatus = 'pending' | 'deposited' | 'cleared' | 'bounced' | 'cancelled';
+
+export interface Cheque {
+  id: string;
+  party_id: string | null;
+  bank_id: string | null;
+  is_online: boolean;
+  cheque_no: string | null;
+  online_ref: string | null;
+  amount: number;
+  issue_date: string;
+  deposit_date: string | null;
+  clearance_date: string | null;
+  status: ChequeStatus;
+  remarks: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface ChequeSummary {
+  pending_count: number;
+  pending_amount: number;
+  cleared_count: number;
+  cleared_amount: number;
+  bounced_count: number;
+  bounced_amount: number;
+  cancelled_count: number;
+  total_count: number;
+  total_amount: number;
+}
+
+export interface ChequePartySummary {
+  party_id: string;
+  party_name: string;
+  short_name: string | null;
+  category: PartyCategory;
+  contact_phone: string | null;
+  is_active: boolean;
+  total_cheques: number;
+  total_issued: number;
+  cleared_count: number;
+  cleared_amount: number;
+  pending_count: number;
+  pending_amount: number;
+  bounced_count: number;
+  bounced_amount: number;
+  last_cheque_date: string | null;
+  last_clearance_date: string | null;
+}
+
+export interface ChequeDepositScheduleRow {
+  deposit_date: string;
+  cheque_count: number;
+  total_amount: number;
+  cheques: Array<{
+    id: string;
+    cheque_no: string | null;
+    is_online: boolean;
+    amount: number;
+    party_name: string;
+  }>;
+}
+

@@ -27,6 +27,9 @@ import {
   CalendarRange,
   Trophy,
   Settings,
+  Wallet,
+  Banknote,
+  CheckCircle,
 } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -89,6 +92,15 @@ const GROUPS: NavGroup[] = [
       { href: '/dashboard/top-customers',       label: 'Top Customers',    desc: 'Ranked by spend',          icon: Trophy },
       { href: '/dashboard/groups',              label: 'Groups',           desc: 'Tags + segmentation',      icon: Tags },
       { href: '/dashboard/sales-upload',        label: 'Upload Sales',     desc: 'Bulk CSV / Excel import',  icon: Upload },
+    ],
+  },
+  {
+    label: 'Cheques',
+    icon: Wallet,
+    items: [
+      { href: '/dashboard/cheques',             label: 'Cheques',          desc: 'Issued cheques + online',  icon: Wallet },
+      { href: '/dashboard/cheques/parties',     label: 'Parties',          desc: 'Vendors / staff master',   icon: Users },
+      { href: '/dashboard/cheques/banks',       label: 'Banks',            desc: 'Bank accounts',            icon: Banknote },
     ],
   },
 ];
