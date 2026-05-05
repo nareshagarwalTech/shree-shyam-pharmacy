@@ -133,7 +133,7 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
                 <option value="hi">Hindi</option>
               </select>
             </Field>
-            <Field label="Reminder buffer (days)" hint="Days before due date to remind">
+            <Field label="Remind this many days early" hint="Send the refill reminder this many days before the medicines run out (e.g. 3 means &lsquo;remind 3 days before&rsquo;).">
               <input
                 type="number"
                 value={bufferDays}

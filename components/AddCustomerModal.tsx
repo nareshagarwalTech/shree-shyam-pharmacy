@@ -159,8 +159,8 @@ export default function AddCustomerModal({ groups, onClose, onSuccess }: Props) 
               </Field>
 
               <Field
-                label="Reminder buffer (days before)"
-                hint="How many days before the due date to remind."
+                label="Remind this many days early"
+                hint="Send refill reminder this many days before medicines run out (e.g. 3)."
               >
                 <input
                   type="number"

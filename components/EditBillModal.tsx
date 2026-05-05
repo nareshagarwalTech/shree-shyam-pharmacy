@@ -230,21 +230,28 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="For days" hint="Used for refill reminder">
+              <Field
+                label="Medicines for (days)"
+                hint="How many days will this supply last? e.g. 30 for a 1-month course. Used to send a refill reminder before they run out."
+              >
                 <input
                   type="number"
                   value={forDays}
                   onChange={(e) => setForDays(e.target.value === '' ? '' : parseInt(e.target.value) || 0)}
                   className={inputCls(false)}
-                  placeholder="—"
+                  placeholder="e.g. 30"
                 />
               </Field>
-              <Field label="Change given (₹)" hint="Returned at delivery">
+              <Field
+                label="Change returned (₹)"
+                hint="Cash given back if customer paid more than the bill (e.g. paid ₹500 for ₹350 bill → 150). Leave 0 if exact."
+              >
                 <input
                   type="number"
                   value={changeGiven || ''}
                   onChange={(e) => setChangeGiven(parseFloat(e.target.value) || 0)}
                   className={inputCls(false)}
+                  placeholder="0"
                 />
               </Field>
             </div>
