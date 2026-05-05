@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase, SalesTransaction, Payment, PaymentChannel } from '@/lib/supabase';
 import { todayISO, formatDate } from '@/lib/utils';
+import { formatPhoneDisplay } from '@/lib/whatsapp';
 import {
   X,
   Loader2,
@@ -14,6 +15,8 @@ import {
   IndianRupee,
   ChevronRight,
   ChevronDown,
+  User,
+  Phone,
 } from 'lucide-react';
 
 interface Props {
@@ -42,6 +45,12 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
   const [notes, setNotes] = useState(bill.delivery_notes || '');
   const [billOpen, setBillOpen] = useState(false);
 
+  // Customer (fetched on mount so we always have the canonical name)
+  const [customerName, setCustomerName] = useState<string>(
+    (bill as any).customer_name || bill.customer_name_raw || '',
+  );
+  const [customerPhone, setCustomerPhone] = useState<string>(bill.customer_phone || '');
+
   // Payment state
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loadingPays, setLoadingPays] = useState(true);
@@ -61,6 +70,25 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
   }, []);
+
+  // Fetch canonical customer info on mount (covers cases where the parent
+  // didn't pre-attach customer_name to the bill row)
+  useEffect(() => {
+    if (!bill.customer_id) return;
+    let cancelled = false;
+    supabase
+      .from('customers')
+      .select('name, phone')
+      .eq('id', bill.customer_id)
+      .maybeSingle()
+      .then(({ data }) => {
+        if (cancelled || !data) return;
+        if (data.name) setCustomerName(data.name);
+        if (data.phone) setCustomerPhone(data.phone);
+      });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bill.customer_id]);
 
   const refreshPayments = async () => {
     setLoadingPays(true);
@@ -203,10 +231,30 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
       <div className="absolute inset-0 bg-black/50 modal-overlay" onClick={onClose} />
       <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-2xl modal-content max-h-[95vh] sm:max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
-          <div className="min-w-0">
-            <h3 className="font-display font-bold text-gray-900 text-base sm:text-lg truncate">Edit Delivery</h3>
-            <p className="text-xs sm:text-sm text-gray-500 font-mono truncate">{bill.bill_no_label || bill.feed_no}</p>
+        <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100 flex items-start justify-between gap-2 shrink-0">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-display font-bold text-gray-900 text-base sm:text-lg">Edit Delivery</h3>
+              <span className="text-xs sm:text-sm text-gray-500 font-mono">{bill.bill_no_label || bill.feed_no}</span>
+            </div>
+            {customerName && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-1 text-sm">
+                <span className="inline-flex items-center gap-1 font-semibold text-gray-900">
+                  <User className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="truncate max-w-[200px] sm:max-w-[320px]">{customerName}</span>
+                </span>
+                {customerPhone && (
+                  <a
+                    href={`tel:${customerPhone}`}
+                    className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-purple-600"
+                    title={`Call ${customerPhone}`}
+                  >
+                    <Phone className="w-3 h-3" />
+                    {formatPhoneDisplay(customerPhone)}
+                  </a>
+                )}
+              </div>
+            )}
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 shrink-0" aria-label="Close">
             <X className="w-4 h-4 text-gray-500" />
