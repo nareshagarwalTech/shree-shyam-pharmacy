@@ -98,9 +98,10 @@ const GROUPS: NavGroup[] = [
     label: 'Cheques',
     icon: Wallet,
     items: [
-      { href: '/dashboard/cheques',             label: 'Cheques',          desc: 'Issued cheques + online',  icon: Wallet },
-      { href: '/dashboard/cheques/parties',     label: 'Parties',          desc: 'Vendors / staff master',   icon: Users },
-      { href: '/dashboard/cheques/banks',       label: 'Banks',            desc: 'Bank accounts',            icon: Banknote },
+      { href: '/dashboard/cheques',             label: 'Cheques',          desc: 'Issued cheques + online',     icon: Wallet },
+      { href: '/dashboard/cheques/deposits',    label: 'Deposit Schedule', desc: 'What hits the bank when',      icon: Calendar },
+      { href: '/dashboard/cheques/parties',     label: 'Parties',          desc: 'Vendors / staff master',      icon: Users },
+      { href: '/dashboard/cheques/banks',       label: 'Banks',            desc: 'Bank accounts',                icon: Banknote },
     ],
   },
 ];

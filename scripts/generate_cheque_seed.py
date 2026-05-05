@@ -153,15 +153,22 @@ def main() -> int:
             st = "cancelled"
 
         cheques.append({
-            "issue_date":     date_v,
-            "party":          None if is_orphan else party,
-            "is_online":      is_online,
-            "cheque_no":      cheq_no_str,
-            "amount":         amt,
-            "status":         st,
-            "clearance_date": clear_v if isinstance(clear_v, (datetime.date, datetime.datetime)) else None,
-            "remarks":        str(remarks_v).strip() if remarks_v else None,
-            "bank":           str(bank_v).strip() if bank_v else None,
+            "issue_date":   date_v,
+            "party":        None if is_orphan else party,
+            "is_online":    is_online,
+            "cheque_no":    cheq_no_str,
+            "amount":       amt,
+            "status":       st,
+            # Migration 011 collapses clearance_date into deposit_date.
+            # Cleared / bounced rows in the Excel get the original clearance_date
+            # (when present) as their deposit_date so the new CHECK constraint
+            # is satisfied; otherwise we fall back to the issue_date.
+            "deposit_date": (
+                clear_v if isinstance(clear_v, (datetime.date, datetime.datetime))
+                else (date_v if st in ("cleared", "bounced", "deposited") else None)
+            ),
+            "remarks":      str(remarks_v).strip() if remarks_v else None,
+            "bank":         str(bank_v).strip() if bank_v else None,
         })
 
     # Cheques without an amount or issue_date can't satisfy NOT NULL constraints —
@@ -206,14 +213,14 @@ def main() -> int:
         )
         sql.append(
             "  INSERT INTO cheques (party_id, bank_id, is_online, cheque_no, amount, "
-            "issue_date, clearance_date, status, remarks) VALUES ("
+            "issue_date, deposit_date, status, remarks) VALUES ("
             f"{party_lookup}, "
             "v_default_bank, "
             f"{'true' if c['is_online'] else 'false'}, "
             f"{sql_str(c['cheque_no'])}, "
             f"{sql_num(c['amount'])}, "
             f"{sql_date(c['issue_date'])}, "
-            f"{sql_date(c['clearance_date'])}, "
+            f"{sql_date(c['deposit_date'])}, "
             f"{sql_str(c['status'])}, "
             f"{sql_str(c['remarks'])}"
             ");"

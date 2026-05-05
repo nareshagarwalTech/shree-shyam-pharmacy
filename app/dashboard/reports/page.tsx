@@ -158,6 +158,13 @@ export default function ReportsHubPage() {
             desc="Cheques + online transfers issued to vendors. Track pending, cleared, bounced."
             color="emerald"
           />
+          <ReportCard
+            href="/dashboard/cheques/deposits"
+            icon={<Calendar className="w-6 h-6" />}
+            title="Deposit Schedule"
+            desc="Pick a date — see exactly how much money needs to be in the bank."
+            color="amber"
+          />
         </div>
 
         <div className="mt-8 bg-white border border-gray-100 rounded-xl p-5">

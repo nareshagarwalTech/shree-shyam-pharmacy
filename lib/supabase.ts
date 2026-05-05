@@ -292,9 +292,10 @@ export interface Cheque {
   cheque_no: string | null;
   online_ref: string | null;
   amount: number;
+  /** "Cheque Date" — date written on the cheque */
   issue_date: string;
+  /** Required when status moves past 'pending' (i.e. deposited / cleared / bounced). */
   deposit_date: string | null;
-  clearance_date: string | null;
   status: ChequeStatus;
   remarks: string | null;
   created_at: string;
@@ -330,7 +331,7 @@ export interface ChequePartySummary {
   bounced_count: number;
   bounced_amount: number;
   last_cheque_date: string | null;
-  last_clearance_date: string | null;
+  last_deposit_date: string | null;
 }
 
 export interface ChequeDepositScheduleRow {
@@ -343,6 +344,7 @@ export interface ChequeDepositScheduleRow {
     is_online: boolean;
     amount: number;
     party_name: string;
+    status: ChequeStatus;
   }>;
 }
 

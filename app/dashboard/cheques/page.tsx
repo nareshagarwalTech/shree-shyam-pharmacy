@@ -27,6 +27,7 @@ import {
   Banknote,
   CreditCard,
   Users,
+  Calendar,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | ChequeStatus;
@@ -89,10 +90,14 @@ export default function ChequesPage() {
   }, [cheques, statusFilter, partyFilter, search, partyMap]);
 
   const quickStatus = async (c: Cheque, newStatus: ChequeStatus) => {
+    const today = new Date().toISOString().slice(0, 10);
+    const needsDeposit = newStatus === 'deposited' || newStatus === 'cleared' || newStatus === 'bounced';
+
+    // If moving past pending and we don't have a deposit_date yet, the
+    // server CHECK constraint will reject the update. Auto-stamp today.
     const update: Partial<Cheque> = { status: newStatus };
-    if (newStatus === 'cleared' && !c.clearance_date) {
-      update.clearance_date = new Date().toISOString().slice(0, 10);
-    }
+    if (needsDeposit && !c.deposit_date) update.deposit_date = today;
+
     const { error } = await supabase.from('cheques').update(update).eq('id', c.id);
     if (error) return setToast({ message: error.message, type: 'error' });
     setToast({ message: `Marked ${newStatus}.`, type: 'success' });
@@ -100,7 +105,7 @@ export default function ChequesPage() {
   };
 
   const exportCsv = () => {
-    const headers = ['Issue Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Bank', 'Status', 'Deposit Date', 'Clearance Date', 'Remarks'];
+    const headers = ['Cheque Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Bank', 'Status', 'Deposit Date', 'Remarks'];
     const lines = [headers.join(',')];
     for (const c of filtered) {
       const party = c.party_id ? partyMap.get(c.party_id)?.name ?? '' : '';
@@ -114,7 +119,6 @@ export default function ChequesPage() {
         `"${bank.replace(/"/g, '""')}"`,
         c.status,
         c.deposit_date ?? '',
-        c.clearance_date ?? '',
         `"${(c.remarks ?? '').replace(/"/g, '""')}"`,
       ].join(','));
     }
@@ -139,6 +143,12 @@ export default function ChequesPage() {
             <p className="text-sm text-gray-500">Track cheques + online transfers issued to vendors.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/dashboard/cheques/deposits"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium"
+            >
+              <Calendar className="w-4 h-4" /> Deposit Schedule
+            </Link>
             <Link
               href="/dashboard/cheques/parties"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium"
@@ -321,12 +331,12 @@ export default function ChequesPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
-                      <Th>Issue Date</Th>
+                      <Th>Cheque Date</Th>
                       <Th>Party</Th>
                       <Th>Cheque #</Th>
                       <Th align="right">Amount</Th>
                       <Th>Status</Th>
-                      <Th>Clearance</Th>
+                      <Th>Deposit Date</Th>
                       <Th>Remarks</Th>
                       <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                     </tr>
@@ -360,7 +370,7 @@ export default function ChequesPage() {
                             <StatusChip status={c.status} />
                           </td>
                           <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap text-xs">
-                            {c.clearance_date ? formatDate(c.clearance_date) : '—'}
+                            {c.deposit_date ? formatDate(c.deposit_date) : '—'}
                           </td>
                           <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[200px] truncate">
                             {c.remarks || '—'}

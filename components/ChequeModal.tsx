@@ -47,9 +47,11 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
   const [amount, setAmount]           = useState<number>(Number(cheque?.amount ?? 0));
   const [issueDate, setIssueDate]     = useState<string>(cheque?.issue_date ?? todayISO());
   const [depositDate, setDepositDate] = useState<string>(cheque?.deposit_date ?? '');
-  const [clearanceDate, setClearanceDate] = useState<string>(cheque?.clearance_date ?? '');
   const [status, setStatus]           = useState<ChequeStatus>(cheque?.status ?? 'pending');
   const [remarks, setRemarks]         = useState<string>(cheque?.remarks ?? '');
+
+  // deposit_date is mandatory once the cheque has moved past 'pending'
+  const depositRequired = status === 'deposited' || status === 'cleared' || status === 'bounced';
 
   const [saving, setSaving] = useState(false);
   const [partySearch, setPartySearch] = useState('');
@@ -76,9 +78,11 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
   const validate = (): string | null => {
     if (!partyId) return 'Please select a party';
     if (amount <= 0) return 'Amount must be greater than 0';
-    if (!issueDate) return 'Issue date is required';
+    if (!issueDate) return 'Cheque date is required';
     if (!isOnline && !chequeNo.trim()) return 'Cheque number is required (or toggle Online)';
-    if (status === 'cleared' && !clearanceDate) return 'Clearance date is required for cleared cheques';
+    if (depositRequired && !depositDate) {
+      return `Deposit date is required when status is "${status}"`;
+    }
     return null;
   };
 
@@ -96,7 +100,6 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
       amount,
       issue_date:     issueDate,
       deposit_date:   depositDate || null,
-      clearance_date: clearanceDate || null,
       status,
       remarks:        remarks.trim() || null,
     };
@@ -255,9 +258,12 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
             </div>
           </Field>
 
-          {/* Dates */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <Field label="Issue date *">
+          {/* Dates — only two: Cheque Date + Deposit Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field
+              label="Cheque date *"
+              hint={isOnline ? 'Date of the online transfer' : 'Date written on the cheque'}
+            >
               <input
                 type="date"
                 value={issueDate}
@@ -265,20 +271,19 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
                 className={inputCls(!issueDate)}
               />
             </Field>
-            <Field label="Deposit date" hint="When you'll bank it">
+            <Field
+              label={depositRequired ? 'Deposit date *' : 'Deposit date'}
+              hint={
+                depositRequired
+                  ? 'Required for this status — when the cheque hit the bank'
+                  : 'Optional — when you plan to bank it'
+              }
+            >
               <input
                 type="date"
                 value={depositDate}
                 onChange={(e) => setDepositDate(e.target.value)}
-                className={inputCls(false)}
-              />
-            </Field>
-            <Field label="Clearance date" hint="When the bank cleared it">
-              <input
-                type="date"
-                value={clearanceDate}
-                onChange={(e) => setClearanceDate(e.target.value)}
-                className={inputCls(status === 'cleared' && !clearanceDate)}
+                className={inputCls(depositRequired && !depositDate)}
               />
             </Field>
           </div>
@@ -292,7 +297,13 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
                   type="button"
                   onClick={() => {
                     setStatus(opt.value);
-                    if (opt.value === 'cleared' && !clearanceDate) setClearanceDate(todayISO());
+                    // If moving past pending and deposit date is empty, prefill with today
+                    if (
+                      (opt.value === 'deposited' || opt.value === 'cleared' || opt.value === 'bounced') &&
+                      !depositDate
+                    ) {
+                      setDepositDate(todayISO());
+                    }
                   }}
                   className={`px-2 py-1.5 rounded-lg border text-xs font-medium ${
                     status === opt.value ? statusActive[opt.value] : 'border-gray-200 text-gray-600 hover:bg-gray-50'
