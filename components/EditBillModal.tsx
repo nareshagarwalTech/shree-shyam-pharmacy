@@ -236,71 +236,8 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
             )}
           </div>
 
-          {/* Add Payment — primary action */}
+          {/* Bill details — top, collapsible */}
           <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-100">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                {adding ? 'Add payment' : `Payments (${payments.length})`}
-              </h4>
-              {!adding && !editingId && (
-                <button
-                  onClick={startAddPayment}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  Add payment
-                </button>
-              )}
-            </div>
-
-            {/* Inline draft form (add OR edit) */}
-            {(adding || editingId) && (
-              <PaymentDraftForm
-                draft={draft}
-                setDraft={setDraft}
-                saving={savingDraft}
-                onSave={saveDraft}
-                onCancel={cancelDraft}
-                isEdit={!!editingId}
-                balanceLeft={balanceLeft}
-              />
-            )}
-
-            {/* Existing payments list */}
-            {loadingPays ? (
-              <div className="py-6 text-center"><div className="spinner mx-auto" /></div>
-            ) : payments.length === 0 ? (
-              !adding && (
-                <div className="py-3 px-4 bg-gray-50 rounded-lg text-sm text-gray-500 text-center mt-3">
-                  No payments recorded yet for this bill.
-                </div>
-              )
-            ) : (
-              <div className="mt-3 space-y-1.5">
-                {payments.map((p) => (
-                  editingId === p.id ? null : (
-                    <PaymentRow
-                      key={p.id}
-                      payment={p}
-                      onEdit={() => startEditPayment(p)}
-                      onDelete={() => delPayment(p)}
-                    />
-                  )
-                ))}
-              </div>
-            )}
-
-            <div className="flex items-start gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 mt-3">
-              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-              <span>
-                Add as many partial payments as needed, on any dates. Each lands on its date in
-                Daily / Monthly Collection.
-              </span>
-            </div>
-          </div>
-
-          {/* Bill details — collapsible */}
-          <div className="px-4 sm:px-6 py-3 sm:py-4">
             <button
               onClick={() => setBillOpen((v) => !v)}
               className="w-full flex items-center justify-between text-left hover:bg-gray-50 -mx-2 px-2 py-1.5 rounded-lg"
@@ -380,6 +317,69 @@ export default function EditBillModal({ bill, onClose, onSaved, onError }: Props
                 </div>
               </div>
             )}
+          </div>
+
+          {/* Payments — bottom, primary action */}
+          <div className="px-4 sm:px-6 py-3 sm:py-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                {adding ? 'Add payment' : `Payments (${payments.length})`}
+              </h4>
+              {!adding && !editingId && (
+                <button
+                  onClick={startAddPayment}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-medium rounded-lg"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Add payment
+                </button>
+              )}
+            </div>
+
+            {/* Inline draft form (add OR edit) */}
+            {(adding || editingId) && (
+              <PaymentDraftForm
+                draft={draft}
+                setDraft={setDraft}
+                saving={savingDraft}
+                onSave={saveDraft}
+                onCancel={cancelDraft}
+                isEdit={!!editingId}
+                balanceLeft={balanceLeft}
+              />
+            )}
+
+            {/* Existing payments list */}
+            {loadingPays ? (
+              <div className="py-6 text-center"><div className="spinner mx-auto" /></div>
+            ) : payments.length === 0 ? (
+              !adding && (
+                <div className="py-3 px-4 bg-gray-50 rounded-lg text-sm text-gray-500 text-center mt-3">
+                  No payments recorded yet for this bill.
+                </div>
+              )
+            ) : (
+              <div className="mt-3 space-y-1.5">
+                {payments.map((p) => (
+                  editingId === p.id ? null : (
+                    <PaymentRow
+                      key={p.id}
+                      payment={p}
+                      onEdit={() => startEditPayment(p)}
+                      onDelete={() => delPayment(p)}
+                    />
+                  )
+                ))}
+              </div>
+            )}
+
+            <div className="flex items-start gap-2 p-2.5 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 mt-3">
+              <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+              <span>
+                Add as many partial payments as needed, on any dates. Each lands on its date in
+                Daily / Monthly Collection.
+              </span>
+            </div>
           </div>
         </div>
 
