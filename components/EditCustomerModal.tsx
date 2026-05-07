@@ -4,7 +4,7 @@ import { useState } from 'react';
 import useEscapeKey from '@/lib/useEscapeKey';
 import { supabase, Customer } from '@/lib/supabase';
 import { isValidIndianPhone } from '@/lib/whatsapp';
-import { X, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
 
 interface Props {
   customer: Customer;
@@ -15,21 +15,18 @@ interface Props {
 
 export default function EditCustomerModal({ customer, onClose, onSaved, onError }: Props) {
   const [name, setName] = useState(customer.name);
-  const [phone, setPhone] = useState(customer.phone);
+  const phone = customer.phone; // read-only — locked as the unique key
   const [altPhone, setAltPhone] = useState(customer.alternate_phone || '');
   const [address, setAddress] = useState(customer.address || '');
   const [language, setLanguage] = useState(customer.preferred_language);
   const [bufferDays, setBufferDays] = useState(customer.reminder_buffer_days);
   const [notes, setNotes] = useState(customer.notes || '');
   const [saving, setSaving] = useState(false);
-  const [phoneChanged, setPhoneChanged] = useState(false);
 
   useEscapeKey(onClose, !saving);
 
   const validate = () => {
     if (!name.trim()) return 'Name required';
-    if (!phone.trim()) return 'Phone required';
-    if (!isValidIndianPhone(phone)) return 'Invalid 10-digit phone';
     if (altPhone && !isValidIndianPhone(altPhone)) return 'Invalid alternate phone';
     return null;
   };
@@ -38,14 +35,14 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
     const err = validate();
     if (err) return onError(err);
 
-    const cleanPhone = phone.replace(/\D/g, '').slice(-10);
     setSaving(true);
 
+    // Phone is intentionally NOT in the update — it's the customer's
+    // unique key and is read-only in the UI.
     const { data, error } = await supabase
       .from('customers')
       .update({
         name: name.trim(),
-        phone: cleanPhone,
         alternate_phone: altPhone ? altPhone.replace(/\D/g, '').slice(-10) : null,
         address: address.trim() || null,
         preferred_language: language,
@@ -58,20 +55,8 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
 
     setSaving(false);
     if (error) {
-      if (error.code === '23505' || /duplicate/i.test(error.message)) {
-        onError('That phone is already in use by another customer');
-      } else {
-        onError(error.message);
-      }
+      onError(error.message);
       return;
-    }
-
-    // If phone changed, also update sales_transactions.customer_phone for consistency
-    if (cleanPhone !== customer.phone) {
-      await supabase
-        .from('sales_transactions')
-        .update({ customer_phone: cleanPhone })
-        .eq('customer_id', customer.id);
     }
 
     onSaved(data as Customer);
@@ -97,13 +82,13 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
             />
           </Field>
 
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Phone *" hint={phoneChanged ? 'Will update on all bills' : undefined}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Phone (cannot change)" hint="Phone is the customer's unique key — locked to keep history intact">
               <input
                 value={phone}
-                onChange={(e) => { setPhone(e.target.value); setPhoneChanged(e.target.value !== customer.phone); }}
-                maxLength={10}
-                className={inputCls(false)}
+                readOnly
+                disabled
+                className={`${inputCls(false)} bg-gray-100 text-gray-500 cursor-not-allowed font-mono`}
               />
             </Field>
             <Field label="Alternate Phone">
@@ -157,15 +142,6 @@ export default function EditCustomerModal({ customer, onClose, onSaved, onError 
             />
           </Field>
 
-          {phoneChanged && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm">
-              <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
-              <span className="text-amber-800">
-                Changing phone will update <strong>all of this customer&apos;s bills</strong> to use the new number.
-                If you intended to merge with another customer, do that separately.
-              </span>
-            </div>
-          )}
         </div>
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-2 rounded-b-2xl shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-gray-700 font-medium hover:bg-white rounded-lg">

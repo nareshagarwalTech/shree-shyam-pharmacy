@@ -1,12 +1,14 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { supabase, CustomerWithGroups, Group } from '@/lib/supabase';
+import Link from 'next/link';
+import { supabase, Customer, CustomerWithGroups, Group } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
 import DashboardHeader from '@/components/DashboardHeader';
 import PhoneLink from '@/components/PhoneLink';
 import Toast from '@/components/Toast';
 import AddCustomerModal from '@/components/AddCustomerModal';
+import EditCustomerModal from '@/components/EditCustomerModal';
 import {
   Search,
   ChevronDown,
@@ -17,6 +19,9 @@ import {
   PlayCircle,
   PauseCircle,
   Users,
+  Pencil,
+  Receipt,
+  ArrowRight,
 } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -28,6 +33,7 @@ export default function CustomersPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [editing, setEditing] = useState<CustomerWithGroups | null>(null);
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -195,7 +201,13 @@ export default function CustomersPage() {
                         </span>
                       </div>
                       <div className="min-w-0 flex-1">
-                        <h3 className="font-semibold text-gray-900 truncate">{c.name}</h3>
+                        <Link
+                          href={`/dashboard/customer/${c.phone}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="font-semibold text-gray-900 hover:text-emerald-600 truncate inline-block max-w-full"
+                        >
+                          {c.name}
+                        </Link>
                         <p className="text-xs sm:text-sm text-gray-500 flex items-center gap-1.5 flex-wrap">
                           <PhoneLink phone={c.phone} className="inline-flex items-center gap-1 text-gray-500 hover:text-purple-600" />
                           {c.whatsapp_opt_out && (
@@ -299,7 +311,22 @@ export default function CustomersPage() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200">
+                      <div className="flex items-center gap-2 pt-2 border-t border-gray-200 flex-wrap">
+                        <Link
+                          href={`/dashboard/customer/${c.phone}`}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg font-medium bg-emerald-500 hover:bg-emerald-600 text-white"
+                        >
+                          <Receipt className="w-4 h-4" />
+                          View statement
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                        <button
+                          onClick={() => setEditing(c)}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg font-medium bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
+                        >
+                          <Pencil className="w-4 h-4" />
+                          Edit details
+                        </button>
                         <button
                           onClick={() => setOptOut(c, !c.whatsapp_opt_out)}
                           className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg font-medium ${
@@ -353,6 +380,19 @@ export default function CustomersPage() {
             fetchAll();
             setToast({ message: 'Customer added.', type: 'success' });
           }}
+        />
+      )}
+
+      {editing && (
+        <EditCustomerModal
+          customer={editing as Customer}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            fetchAll();
+            setToast({ message: 'Customer updated.', type: 'success' });
+          }}
+          onError={(m) => setToast({ message: m, type: 'error' })}
         />
       )}
 
