@@ -49,6 +49,9 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
   const [depositDate, setDepositDate] = useState<string>(cheque?.deposit_date ?? '');
   const [status, setStatus]           = useState<ChequeStatus>(cheque?.status ?? 'pending');
   const [remarks, setRemarks]         = useState<string>(cheque?.remarks ?? '');
+  const [ledgerNo, setLedgerNo]       = useState<string>(cheque?.ledger_no ?? '');
+  const [periodFrom, setPeriodFrom]   = useState<string>(cheque?.period_from ?? '');
+  const [periodTo, setPeriodTo]       = useState<string>(cheque?.period_to ?? '');
 
   // deposit_date is mandatory once the cheque has moved past 'pending'
   const depositRequired = status === 'deposited' || status === 'cleared' || status === 'bounced';
@@ -83,6 +86,9 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
     if (depositRequired && !depositDate) {
       return `Deposit date is required when status is "${status}"`;
     }
+    if (periodFrom && periodTo && periodTo < periodFrom) {
+      return 'Invoice period: "to" date must be on or after "from" date';
+    }
     return null;
   };
 
@@ -102,6 +108,9 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
       deposit_date:   depositDate || null,
       status,
       remarks:        remarks.trim() || null,
+      ledger_no:      ledgerNo.trim() || null,
+      period_from:    periodFrom || null,
+      period_to:      periodTo || null,
     };
 
     if (isEdit && cheque) {
@@ -314,6 +323,44 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
               ))}
             </div>
           </Field>
+
+          {/* Ledger No */}
+          <Field label="Ledger No" hint="Accounting ledger reference (optional)">
+            <input
+              value={ledgerNo}
+              onChange={(e) => setLedgerNo(e.target.value)}
+              placeholder="e.g. LED/2026/04/123"
+              className={`${inputCls(false)} font-mono text-sm`}
+            />
+          </Field>
+
+          {/* Invoice period covered by this cheque */}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">
+              Invoice period paid by this cheque
+            </label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="From" hint="Start of invoice period">
+                <input
+                  type="date"
+                  value={periodFrom}
+                  onChange={(e) => setPeriodFrom(e.target.value)}
+                  className={inputCls(false)}
+                />
+              </Field>
+              <Field label="To" hint="End of invoice period">
+                <input
+                  type="date"
+                  value={periodTo}
+                  onChange={(e) => setPeriodTo(e.target.value)}
+                  className={inputCls(!!(periodFrom && periodTo && periodTo < periodFrom))}
+                />
+              </Field>
+            </div>
+            <p className="text-[11px] text-gray-500 mt-0.5 leading-snug">
+              e.g. invoices from 1 March to 31 March settled by this single cheque. Both optional.
+            </p>
+          </div>
 
           {/* Remarks */}
           <Field label="Remarks">

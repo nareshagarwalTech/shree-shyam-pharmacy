@@ -105,7 +105,7 @@ export default function ChequesPage() {
   };
 
   const exportCsv = () => {
-    const headers = ['Cheque Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Bank', 'Status', 'Deposit Date', 'Remarks'];
+    const headers = ['Cheque Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Bank', 'Ledger No', 'Period From', 'Period To', 'Status', 'Deposit Date', 'Remarks'];
     const lines = [headers.join(',')];
     for (const c of filtered) {
       const party = c.party_id ? partyMap.get(c.party_id)?.name ?? '' : '';
@@ -117,6 +117,9 @@ export default function ChequesPage() {
         c.is_online ? 'Y' : 'N',
         c.amount,
         `"${bank.replace(/"/g, '""')}"`,
+        `"${(c.ledger_no ?? '').replace(/"/g, '""')}"`,
+        c.period_from ?? '',
+        c.period_to ?? '',
         c.status,
         c.deposit_date ?? '',
         `"${(c.remarks ?? '').replace(/"/g, '""')}"`,
@@ -316,6 +319,18 @@ export default function ChequesPage() {
                         <StatusChip status={c.status} />
                       </div>
                     </div>
+                    {(c.ledger_no || c.period_from || c.period_to) && (
+                      <div className="text-[11px] text-gray-500 mb-1.5 flex flex-wrap gap-x-2">
+                        {c.ledger_no && <span>📒 <span className="font-mono">{c.ledger_no}</span></span>}
+                        {(c.period_from || c.period_to) && (
+                          <span>
+                            📅 {c.period_from ? formatDate(c.period_from) : '?'}
+                            {' → '}
+                            {c.period_to ? formatDate(c.period_to) : '?'}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {c.remarks && (
                       <div className="text-xs text-gray-500 truncate mb-2">{c.remarks}</div>
                     )}
@@ -337,6 +352,7 @@ export default function ChequesPage() {
                       <Th align="right">Amount</Th>
                       <Th>Status</Th>
                       <Th>Deposit Date</Th>
+                      <Th>Ledger / Period</Th>
                       <Th>Remarks</Th>
                       <th className="px-3 py-3 text-right text-xs font-semibold text-gray-600 uppercase">Actions</th>
                     </tr>
@@ -371,6 +387,17 @@ export default function ChequesPage() {
                           </td>
                           <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap text-xs">
                             {c.deposit_date ? formatDate(c.deposit_date) : '—'}
+                          </td>
+                          <td className="px-4 py-2.5 text-xs text-gray-600">
+                            {c.ledger_no && <div className="font-mono text-gray-700">{c.ledger_no}</div>}
+                            {(c.period_from || c.period_to) && (
+                              <div className="text-gray-500 whitespace-nowrap">
+                                {c.period_from ? formatDate(c.period_from) : '?'}
+                                {' → '}
+                                {c.period_to ? formatDate(c.period_to) : '?'}
+                              </div>
+                            )}
+                            {!c.ledger_no && !c.period_from && !c.period_to && <span className="text-gray-300">—</span>}
                           </td>
                           <td className="px-4 py-2.5 text-xs text-gray-500 max-w-[200px] truncate">
                             {c.remarks || '—'}

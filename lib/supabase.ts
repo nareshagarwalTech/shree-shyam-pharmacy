@@ -302,6 +302,12 @@ export interface Cheque {
   deposit_date: string | null;
   status: ChequeStatus;
   remarks: string | null;
+  /** Accounting ledger reference (migration 015). */
+  ledger_no?: string | null;
+  /** First date of the invoice period this cheque settles (migration 015). */
+  period_from?: string | null;
+  /** Last date of the invoice period this cheque settles (migration 015). */
+  period_to?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;
