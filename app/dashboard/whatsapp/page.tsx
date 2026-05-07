@@ -155,9 +155,25 @@ export default function WhatsAppCenterPage() {
   }, [rows, searchQuery, filter, hideSent]);
 
   const stats = useMemo(() => {
+    let outstanding = 0;
+    let refill = 0;
+    let overdue = 0;
+    let sent = 0;
+    for (const r of rows) {
+      if (r.sentToday) sent += 1;
+      const owes = Number((r.customer as any).outstanding || 0) > 0;
+      const d = r.customer.days_until_reminder;
+      const isOverdue = d !== null && d !== undefined && d < 0;
+      if (owes) {
+        outstanding += 1;
+      } else if (isOverdue) {
+        overdue += 1;
+      } else if (d !== null && d !== undefined && d <= 7) {
+        refill += 1;
+      }
+    }
     const total = rows.length;
-    const sent = rows.filter((r) => r.sentToday).length;
-    return { total, sent, remaining: total - sent };
+    return { total, outstanding, overdue, refill, sent, remaining: total - sent };
   }, [rows]);
 
   const openWA = (r: RowState) => {
@@ -266,11 +282,43 @@ export default function WhatsAppCenterPage() {
           </div>
         </div>
 
-        {/* Stat tiles */}
-        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-6">
-          <Tile label="Need reminder" value={String(stats.total)} color="indigo" />
-          <Tile label="Sent today" value={String(stats.sent)} color="emerald" sub={stats.sent > 0 ? `${Math.round((stats.sent / stats.total) * 100)}% done` : undefined} />
-          <Tile label="Remaining" value={String(stats.remaining)} color="amber" />
+        {/* Stat tiles — one per category, click to filter */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 mb-3">
+          <Tile
+            label="Outstanding"
+            sub="customers who owe ₹"
+            value={String(stats.outstanding)}
+            color="red"
+            active={filter === 'due'}
+            onClick={() => setFilter(filter === 'due' ? 'all' : 'due')}
+          />
+          <Tile
+            label="Overdue refill"
+            sub="refill date passed"
+            value={String(stats.overdue)}
+            color="amber"
+            active={filter === 'overdue'}
+            onClick={() => setFilter(filter === 'overdue' ? 'all' : 'overdue')}
+          />
+          <Tile
+            label="Refill due"
+            sub="due in next 7 days"
+            value={String(stats.refill)}
+            color="indigo"
+            active={filter === 'refill'}
+            onClick={() => setFilter(filter === 'refill' ? 'all' : 'refill')}
+          />
+          <Tile
+            label="Sent today"
+            sub={stats.total > 0 ? `${Math.round((stats.sent / stats.total) * 100)}% of ${stats.total}` : undefined}
+            value={String(stats.sent)}
+            color="emerald"
+          />
+        </div>
+        <div className="text-xs text-gray-500 mb-6">
+          {stats.total === 0
+            ? 'No customers need a reminder right now.'
+            : `${stats.remaining} of ${stats.total} customers still need a reminder today. Tap a tile above to filter.`}
         </div>
 
         {/* Filters */}
@@ -535,20 +583,42 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 }
 
-function Tile({ label, value, sub, color }: {
+function Tile({ label, value, sub, color, active, onClick }: {
   label: string; value: string; sub?: string;
-  color: 'indigo' | 'emerald' | 'amber';
+  color: 'indigo' | 'emerald' | 'amber' | 'red';
+  active?: boolean;
+  onClick?: () => void;
 }) {
   const map: Record<string, string> = {
     indigo:  'bg-indigo-50 border-indigo-200 text-indigo-700',
     emerald: 'bg-emerald-50 border-emerald-200 text-emerald-700',
     amber:   'bg-amber-50 border-amber-200 text-amber-700',
+    red:     'bg-red-50 border-red-200 text-red-700',
   };
-  return (
-    <div className={`rounded-xl border p-3 sm:p-4 ${map[color]}`}>
-      <div className="text-[11px] sm:text-xs font-medium opacity-70 leading-tight">{label}</div>
+  const base = `rounded-xl border p-3 sm:p-4 text-left transition-all ${map[color]}`;
+  const interactive = onClick
+    ? 'hover:shadow-sm cursor-pointer'
+    : 'cursor-default';
+  const ring = active ? 'ring-2 ring-offset-2 ring-emerald-500' : '';
+
+  const inner = (
+    <>
+      <div className="text-[11px] sm:text-xs font-semibold opacity-80 leading-tight uppercase tracking-wide">{label}</div>
       <div className="text-2xl sm:text-3xl font-display font-bold mt-1">{value}</div>
       {sub && <div className="text-[10px] sm:text-xs opacity-70 mt-1 leading-tight">{sub}</div>}
-    </div>
+    </>
   );
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`${base} ${interactive} ${ring}`}
+      >
+        {inner}
+      </button>
+    );
+  }
+  return <div className={`${base} ${interactive}`}>{inner}</div>;
 }
