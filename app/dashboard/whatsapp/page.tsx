@@ -34,13 +34,46 @@ import {
 
 type FilterKind = 'all' | 'due' | 'refill' | 'overdue';
 
+/**
+ * After a reminder is sent we don't ask the user to send another one for
+ * this many days, unless the customer purchases something fresh in the
+ * meantime (which lifts the cooldown immediately).
+ */
+const COOLDOWN_DAYS = 3;
+const DAY_MS = 86_400_000;
+
+interface CooldownState {
+  active: boolean;
+  endsAt?: Date;
+  daysLeft?: number;
+}
+
+function computeCooldown(
+  lastReminderSent: string | null | undefined,
+  lastPurchaseDate: string | null | undefined,
+): CooldownState {
+  if (!lastReminderSent) return { active: false };
+  const sentAt = new Date(lastReminderSent);
+  const endsAt = new Date(sentAt.getTime() + COOLDOWN_DAYS * DAY_MS);
+  if (Date.now() >= endsAt.getTime()) return { active: false };
+  // If the customer purchased AFTER the last reminder, lift the cooldown
+  if (lastPurchaseDate) {
+    const purchase = new Date(lastPurchaseDate);
+    if (purchase.getTime() > sentAt.getTime()) return { active: false };
+  }
+  const daysLeft = Math.max(1, Math.ceil((endsAt.getTime() - Date.now()) / DAY_MS));
+  return { active: true, endsAt, daysLeft };
+}
+
 interface RowState {
   customer: CustomerNextReminder;
   reasonLabel: string;
   templateName: string;
   message: string;
-  /** sent today = entry in reminders table since midnight */
+  /** sent today = entry in reminders table since midnight (kept for the "sent" pill) */
   sentToday: { id: string; sent_at: string } | null;
+  /** Cooldown info — derived from last_reminder_sent + last_purchase_date */
+  cooldown: CooldownState;
 }
 
 export default function WhatsAppCenterPage() {
@@ -51,7 +84,8 @@ export default function WhatsAppCenterPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filter, setFilter] = useState<FilterKind>('all');
-  const [hideSent, setHideSent] = useState(true);
+  /** Default ON: hide customers we already reminded in the last 3 days. */
+  const [hideCooldown, setHideCooldown] = useState(true);
   const [showPreview, setShowPreview] = useState<string | null>(null);
   // Per-customer message overrides (when staff edits the preview)
   const [edits, setEdits] = useState<Map<string, string>>(new Map());
@@ -104,6 +138,7 @@ export default function WhatsAppCenterPage() {
           templateName: pick.templateName,
           message: pick.message,
           sentToday: sentToday.get(r.customer_id) || null,
+          cooldown: computeCooldown(r.last_reminder_sent, r.last_purchase_date),
         };
       })
       .filter((x): x is RowState => x !== null);
@@ -148,19 +183,21 @@ export default function WhatsAppCenterPage() {
         return d !== null && d !== undefined && d < 0;
       });
     }
-    if (hideSent) {
-      out = out.filter((r) => !r.sentToday);
+    if (hideCooldown) {
+      out = out.filter((r) => !r.cooldown.active);
     }
     return out;
-  }, [rows, searchQuery, filter, hideSent]);
+  }, [rows, searchQuery, filter, hideCooldown]);
 
   const stats = useMemo(() => {
     let outstanding = 0;
     let refill = 0;
     let overdue = 0;
     let sent = 0;
+    let inCooldown = 0;
     for (const r of rows) {
       if (r.sentToday) sent += 1;
+      if (r.cooldown.active) inCooldown += 1;
       const owes = Number((r.customer as any).outstanding || 0) > 0;
       const d = r.customer.days_until_reminder;
       const isOverdue = d !== null && d !== undefined && d < 0;
@@ -173,7 +210,7 @@ export default function WhatsAppCenterPage() {
       }
     }
     const total = rows.length;
-    return { total, outstanding, overdue, refill, sent, remaining: total - sent };
+    return { total, outstanding, overdue, refill, sent, inCooldown, remaining: total - sent };
   }, [rows]);
 
   const openWA = (r: RowState) => {
@@ -355,14 +392,20 @@ export default function WhatsAppCenterPage() {
                 ))}
               </div>
               <button
-                onClick={() => setHideSent((v) => !v)}
+                onClick={() => setHideCooldown((v) => !v)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium border ${
-                  hideSent ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-200 text-gray-600'
+                  hideCooldown ? 'bg-emerald-50 border-emerald-200 text-emerald-700' : 'bg-gray-50 border-gray-200 text-gray-600'
                 }`}
-                title={hideSent ? 'Showing only remaining' : 'Showing everyone'}
+                title={
+                  hideCooldown
+                    ? `Hiding ${stats.inCooldown} customer${stats.inCooldown === 1 ? '' : 's'} reminded in last ${COOLDOWN_DAYS} days`
+                    : 'Showing everyone, including recently reminded'
+                }
               >
-                {hideSent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                <span className="hidden sm:inline">{hideSent ? 'Hide sent' : 'Show all'}</span>
+                {hideCooldown ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <span className="hidden sm:inline">
+                  {hideCooldown ? `Hide reminded (${COOLDOWN_DAYS}d)` : 'Show all'}
+                </span>
               </button>
               {filtered.filter((r) => !r.sentToday).length > 1 && (
                 <button
@@ -384,19 +427,21 @@ export default function WhatsAppCenterPage() {
           <div className="bg-white rounded-xl border border-gray-100 p-12 text-center">
             <CheckCircle className="w-12 h-12 text-emerald-300 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-gray-700 mb-1">
-              {hideSent && stats.sent > 0 ? 'All done for today!' : 'No reminders pending'}
+              {hideCooldown && stats.inCooldown > 0
+                ? 'All caught up!'
+                : 'No reminders pending'}
             </h3>
             <p className="text-gray-500">
-              {hideSent && stats.sent > 0
-                ? `Sent ${stats.sent} reminder${stats.sent === 1 ? '' : 's'} today.`
+              {hideCooldown && stats.inCooldown > 0
+                ? `${stats.inCooldown} customer${stats.inCooldown === 1 ? ' is' : 's are'} in their ${COOLDOWN_DAYS}-day cooldown — already reminded recently.`
                 : 'No customers currently need a reminder.'}
             </p>
-            {hideSent && stats.sent > 0 && (
+            {hideCooldown && stats.inCooldown > 0 && (
               <button
-                onClick={() => setHideSent(false)}
+                onClick={() => setHideCooldown(false)}
                 className="mt-4 text-sm text-emerald-600 hover:underline"
               >
-                Show already-sent reminders
+                Show recently-reminded customers anyway
               </button>
             )}
           </div>
@@ -432,6 +477,14 @@ export default function WhatsAppCenterPage() {
                         {r.customer.whatsapp_opt_out && (
                           <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600 rounded uppercase">
                             opted out
+                          </span>
+                        )}
+                        {r.cooldown.active && !sent && (
+                          <span
+                            className="px-1.5 py-0.5 text-[10px] font-semibold bg-slate-100 text-slate-600 rounded uppercase"
+                            title={`Reminded recently — won't nag again until ${r.cooldown.endsAt ? formatDate(r.cooldown.endsAt.toISOString()) : ''}`}
+                          >
+                            🔕 cooldown · {r.cooldown.daysLeft}d left
                           </span>
                         )}
                       </div>

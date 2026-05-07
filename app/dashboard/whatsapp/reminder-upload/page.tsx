@@ -29,6 +29,10 @@ interface ReminderRow {
   source_rows: number;       // how many Excel rows collapsed into this one
   customer_id?: string;       // resolved from DB if customer exists
   is_new: boolean;            // will be auto-created
+  /** Existing date already on the customer record — only set when we'd skip this row. */
+  existing_date?: string;
+  /** True if this row would move the customer's date BACKWARD — we skip these. */
+  is_stale: boolean;
 }
 
 export default function ReminderUploadPage() {
@@ -39,6 +43,7 @@ export default function ReminderUploadPage() {
   const [updatedCount, setUpdatedCount] = useState(0);
   const [createdCount, setCreatedCount] = useState(0);
   const [skippedCount, setSkippedCount] = useState(0);
+  const [staleCount, setStaleCount] = useState(0);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -50,6 +55,7 @@ export default function ReminderUploadPage() {
     setUpdatedCount(0);
     setCreatedCount(0);
     setSkippedCount(0);
+    setStaleCount(0);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -78,32 +84,48 @@ export default function ReminderUploadPage() {
           last_purchase_date:  r.feed_date,
           for_days:            r.for_days,
           source_rows:         (existing?.source_rows ?? 0) + 1,
-          is_new:              true, // will be flipped after DB lookup
+          is_new:              true,    // flipped after DB lookup
+          is_stale:            false,   // flipped after DB lookup
         });
       } else {
         existing.source_rows += 1;
       }
     }
 
-    // Look up which phones already exist
+    // Look up which phones already exist + their current reminder dates so
+    // we can flag rows that would move a customer's date BACKWARDS.
     const phones = Array.from(agg.keys());
     const { data: existing } = await supabase
       .from('customers')
-      .select('id,phone,name')
+      .select('id,phone,name,reminder_last_purchase_date')
       .in('phone', phones);
-    const phoneMap = new Map((existing || []).map((c) => [c.phone, { id: c.id, name: c.name }]));
+    const phoneMap = new Map(
+      (existing || []).map((c) => [c.phone, {
+        id:                          c.id,
+        name:                        c.name,
+        reminder_last_purchase_date: c.reminder_last_purchase_date as string | null,
+      }]),
+    );
 
     const list: ReminderRow[] = Array.from(agg.values()).map((r) => {
       const match = phoneMap.get(r.phone);
+      const existingDate = match?.reminder_last_purchase_date ?? null;
+      // A row is "stale" if the existing customer already has a NEWER reminder
+      // date — uploading would move them backwards, which is almost always wrong.
+      const isStale = !!existingDate && existingDate >= r.last_purchase_date;
       return {
         ...r,
-        customer_id: match?.id,
-        is_new:      !match,
+        customer_id:   match?.id,
+        is_new:        !match,
+        existing_date: existingDate ?? undefined,
+        is_stale:      isStale,
       };
     });
     list.sort((a, b) => b.last_purchase_date.localeCompare(a.last_purchase_date));
+    const stale = list.filter((r) => r.is_stale).length;
     setRows(list);
     setSkippedCount(skipped);
+    setStaleCount(stale);
     setStep('preview');
   };
 
@@ -158,9 +180,13 @@ export default function ReminderUploadPage() {
     }
     setProgress(50);
 
-    // 3. Update reminder fields for existing customers (NAME left untouched)
+    // 3. Update reminder fields for existing customers (NAME left untouched).
+    // Skip "stale" rows — those would push a customer's date backwards, which
+    // would re-trigger reminders we already handled. The user can still see
+    // them in the preview as "stale" and decide whether to re-upload a fresh
+    // file.
     let updated = 0;
-    const existingRows = rows.filter((r) => !r.is_new);
+    const existingRows = rows.filter((r) => !r.is_new && !r.is_stale);
     for (let i = 0; i < existingRows.length; i += 50) {
       const chunk = existingRows.slice(i, i + 50);
       // Bulk update via individual calls — Supabase doesn't have a multi-row UPDATE
@@ -246,6 +272,7 @@ export default function ReminderUploadPage() {
             parsed={parsed}
             rows={rows}
             skippedCount={skippedCount}
+            staleCount={staleCount}
             onCancel={reset}
             onConfirm={handleImport}
           />
@@ -268,7 +295,7 @@ export default function ReminderUploadPage() {
           <div className="bg-white rounded-xl border border-emerald-200 shadow-sm p-8 text-center">
             <CheckCircle className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
             <h3 className="font-display font-semibold text-gray-900 mb-1">All done!</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 max-w-md mx-auto mt-4 text-sm">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 max-w-2xl mx-auto mt-4 text-sm">
               <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3">
                 <div className="text-2xl font-display font-bold text-emerald-700">{updatedCount}</div>
                 <div className="text-xs text-emerald-700">existing customers updated</div>
@@ -277,9 +304,13 @@ export default function ReminderUploadPage() {
                 <div className="text-2xl font-display font-bold text-blue-700">{createdCount}</div>
                 <div className="text-xs text-blue-700">new customers created</div>
               </div>
+              <div className="rounded-lg bg-amber-50 border border-amber-200 p-3" title="Already have a newer reminder date — would have moved them backwards">
+                <div className="text-2xl font-display font-bold text-amber-700">{staleCount}</div>
+                <div className="text-xs text-amber-700">stale rows skipped</div>
+              </div>
               <div className="rounded-lg bg-gray-50 border border-gray-200 p-3">
                 <div className="text-2xl font-display font-bold text-gray-700">{skippedCount}</div>
-                <div className="text-xs text-gray-700">rows skipped (no phone / no date)</div>
+                <div className="text-xs text-gray-700">no phone / no date</div>
               </div>
             </div>
             <div className="flex items-center justify-center gap-2 mt-6">
@@ -305,16 +336,18 @@ export default function ReminderUploadPage() {
 }
 
 function PreviewStep({
-  parsed, rows, skippedCount, onCancel, onConfirm,
+  parsed, rows, skippedCount, staleCount, onCancel, onConfirm,
 }: {
   parsed: SalesParseResult;
   rows: ReminderRow[];
   skippedCount: number;
+  staleCount: number;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
-  const newCount = rows.filter((r) => r.is_new).length;
-  const existingCount = rows.length - newCount;
+  const newCount      = rows.filter((r) => r.is_new).length;
+  const existingFresh = rows.filter((r) => !r.is_new && !r.is_stale).length;
+  const willImport    = newCount + existingFresh;
 
   if (!rows.length) {
     return (
@@ -346,11 +379,22 @@ function PreviewStep({
     <>
       {/* Summary tiles */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-6">
-        <Tile label="Customers in file" value={String(rows.length)} icon={Users} color="emerald" />
-        <Tile label="To create" value={String(newCount)}      icon={UserPlus} color="blue" />
-        <Tile label="To update" value={String(existingCount)} icon={RefreshCcw} color="amber" />
-        <Tile label="Rows skipped" value={String(skippedCount + parsed.errors.length)} icon={AlertCircle} color="gray" />
+        <Tile label="To create"      value={String(newCount)}      icon={UserPlus} color="blue" />
+        <Tile label="To update"      value={String(existingFresh)} icon={RefreshCcw} color="emerald" />
+        <Tile label="Stale (skip)"   value={String(staleCount)}    icon={AlertCircle} color="amber" />
+        <Tile label="No phone/date"  value={String(skippedCount + parsed.errors.length)} icon={AlertCircle} color="gray" />
       </div>
+      {staleCount > 0 && (
+        <div className="flex items-start gap-2 p-3 mb-6 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold mb-0.5">{staleCount} row{staleCount === 1 ? '' : 's'} will be skipped — already have a newer purchase date</p>
+            <p>
+              These customers already have a purchase date in the system that&apos;s the same or newer than what&apos;s in the file. We won&apos;t move them backwards (that would make them re-appear as overdue when they&apos;re not).
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Preview table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-6">
@@ -373,18 +417,27 @@ function PreviewStep({
             </thead>
             <tbody className="divide-y divide-gray-100">
               {rows.slice(0, 100).map((r) => (
-                <tr key={r.phone} className="hover:bg-gray-50">
+                <tr key={r.phone} className={`hover:bg-gray-50 ${r.is_stale ? 'opacity-60' : ''}`}>
                   <td className="px-3 py-2 font-mono text-xs">{r.phone}</td>
                   <td className="px-3 py-2 text-gray-900 truncate max-w-[200px]">{r.customer_name_raw}</td>
-                  <td className="px-3 py-2 text-gray-700 text-xs">{r.last_purchase_date}</td>
+                  <td className="px-3 py-2 text-gray-700 text-xs">
+                    {r.last_purchase_date}
+                    {r.is_stale && r.existing_date && (
+                      <div className="text-[10px] text-amber-700">already on file: {r.existing_date}</div>
+                    )}
+                  </td>
                   <td className="px-3 py-2 text-right text-gray-700">{r.for_days}</td>
                   <td className="px-3 py-2">
-                    {r.is_new ? (
+                    {r.is_stale ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 uppercase">
+                        <AlertCircle className="w-3 h-3" /> stale · skip
+                      </span>
+                    ) : r.is_new ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-blue-100 text-blue-700 uppercase">
                         <UserPlus className="w-3 h-3" /> new
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700 uppercase">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700 uppercase">
                         <RefreshCcw className="w-3 h-3" /> update
                       </span>
                     )}
@@ -407,10 +460,11 @@ function PreviewStep({
         </button>
         <button
           onClick={onConfirm}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg text-sm"
+          disabled={willImport === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-lg text-sm disabled:opacity-50"
         >
           <Upload className="w-4 h-4" />
-          Import {rows.length} reminder{rows.length === 1 ? '' : 's'}
+          Import {willImport} reminder{willImport === 1 ? '' : 's'}
         </button>
       </div>
     </>
