@@ -316,7 +316,7 @@ export default function DashboardPage() {
               </button>
 
               <Link
-                href="/dashboard/sales-upload"
+                href="/dashboard/whatsapp/reminder-upload"
                 className="flex items-center gap-2 px-4 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium"
               >
                 <Upload className="w-4 h-4" />
@@ -369,7 +369,7 @@ export default function DashboardPage() {
               <EmptyState
                 hasCustomers
                 onAddClick={() => setShowAddModal(true)}
-                onImportClick={() => (window.location.href = '/dashboard/sales-upload')}
+                onImportClick={() => (window.location.href = '/dashboard/whatsapp/reminder-upload')}
               />
             )
           ) : viewMode === 'cards' ? (
@@ -435,7 +435,7 @@ function EmptyStateInitial() {
       </p>
       <div className="flex items-center justify-center gap-4">
         <Link
-          href="/dashboard/sales-upload"
+          href="/dashboard/whatsapp/reminder-upload"
           className="flex items-center gap-2 px-5 py-2.5 border border-gray-200 rounded-lg text-gray-700 font-medium hover:bg-gray-50"
         >
           <Upload className="w-5 h-5" />

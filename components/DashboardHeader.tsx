@@ -67,10 +67,11 @@ const GROUPS: NavGroup[] = [
     label: 'WhatsApp',
     icon: MessageCircle,
     items: [
-      { href: '/dashboard/whatsapp',            label: 'WhatsApp Center',  desc: 'Send daily reminders',     icon: MessageCircle },
-      { href: '/dashboard/broadcast',           label: 'Broadcast Offers', desc: 'Bulk send to groups',      icon: Megaphone },
-      { href: '/dashboard/settings/templates',  label: 'Message Templates',desc: 'Edit wording',             icon: MessageSquareText },
-      { href: '/dashboard/history',             label: 'Sent Log',         desc: 'Audit of all reminders',   icon: History },
+      { href: '/dashboard/whatsapp',                  label: 'WhatsApp Center',   desc: 'Send daily reminders',          icon: MessageCircle },
+      { href: '/dashboard/whatsapp/reminder-upload',  label: 'Reminder Upload',   desc: 'Bulk-set refill dates from Excel', icon: Upload },
+      { href: '/dashboard/broadcast',                 label: 'Broadcast Offers',  desc: 'Bulk send to groups',           icon: Megaphone },
+      { href: '/dashboard/settings/templates',        label: 'Message Templates', desc: 'Edit wording',                  icon: MessageSquareText },
+      { href: '/dashboard/history',                   label: 'Sent Log',          desc: 'Audit of all reminders',        icon: History },
     ],
   },
   {
@@ -91,7 +92,6 @@ const GROUPS: NavGroup[] = [
       { href: '/dashboard/customers',           label: 'All Customers',    desc: 'Master list',              icon: Users },
       { href: '/dashboard/top-customers',       label: 'Top Customers',    desc: 'Ranked by spend',          icon: Trophy },
       { href: '/dashboard/groups',              label: 'Groups',           desc: 'Tags + segmentation',      icon: Tags },
-      { href: '/dashboard/sales-upload',        label: 'Upload Sales',     desc: 'Bulk CSV / Excel import',  icon: Upload },
     ],
   },
   {

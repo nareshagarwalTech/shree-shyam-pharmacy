@@ -43,6 +43,10 @@ export interface Customer {
   notes?: string | null;
   source: 'manual' | 'master_import' | 'sale_import';
   is_active: boolean;
+  /** Set by Reminder Upload (migration 012). Drives the refill reminder date. */
+  reminder_last_purchase_date?: string | null;
+  /** Days the medicines from the latest purchase will last (migration 012). */
+  reminder_for_days?: number | null;
   created_at: string;
   updated_at: string;
 }

@@ -29,6 +29,7 @@ import {
   Pencil,
   Settings,
   RotateCcw,
+  Calendar,
 } from 'lucide-react';
 
 type FilterKind = 'all' | 'due' | 'refill' | 'overdue';
@@ -92,7 +93,8 @@ export default function WhatsAppCenterPage() {
           language: r.preferred_language,
           phone: r.phone,
           address: r.address,
-          lastPurchaseDate: r.last_purchase_date,
+          // Format ISO date as readable "5 May 2026" for the WhatsApp message body
+          lastPurchaseDate: r.last_purchase_date ? formatDate(r.last_purchase_date) : null,
           templates,
         });
         if (!pick) return null;
@@ -236,10 +238,19 @@ export default function WhatsAppCenterPage() {
               Click <strong>Open</strong> to launch the WhatsApp app with the message ready, then click <strong>Mark Sent</strong> after sending.
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link
+              href="/dashboard/whatsapp/reminder-upload"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium text-sm"
+              title="Upload sales register to refresh reminder dates"
+            >
+              <RotateCcw className="w-4 h-4" />
+              <span className="hidden sm:inline">Reminder Upload</span>
+              <span className="sm:hidden">Upload</span>
+            </Link>
             <Link
               href="/dashboard/settings/templates"
-              className="flex items-center gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium text-sm"
               title="Edit message templates"
             >
               <Settings className="w-4 h-4" />
@@ -247,7 +258,8 @@ export default function WhatsAppCenterPage() {
             </Link>
             <button
               onClick={() => { setRefreshing(true); fetchAll(); }}
-              className="p-2.5 rounded-lg border border-gray-200 hover:bg-gray-50"
+              className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+              aria-label="Refresh"
             >
               <RefreshCw className={`w-5 h-5 text-gray-600 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -384,12 +396,17 @@ export default function WhatsAppCenterPage() {
                       </a>
                       <div className="text-sm mt-1 flex items-center gap-1.5 flex-wrap">
                         <span className="font-medium text-amber-700">{r.reasonLabel}</span>
-                        {r.customer.last_purchase_date && (
-                          <span className="text-xs text-gray-400">
-                            · last bill {formatDate(r.customer.last_purchase_date)}
-                          </span>
-                        )}
                       </div>
+                      {r.customer.last_purchase_date && (
+                        <div className="text-xs text-gray-600 mt-1 inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 border border-emerald-100 rounded-md">
+                          <Calendar className="w-3 h-3 text-emerald-600" />
+                          <span className="font-medium text-emerald-800">Last purchase:</span>
+                          <span className="text-emerald-700">{formatDate(r.customer.last_purchase_date)}</span>
+                          {r.customer.last_for_days && (
+                            <span className="text-gray-500">· {r.customer.last_for_days} day supply</span>
+                          )}
+                        </div>
+                      )}
                       {r.customer.last_reminder_sent && !sent && (
                         <div className="text-xs text-gray-500 mt-1">
                           Last reminder: {formatDate(r.customer.last_reminder_sent)}
