@@ -87,25 +87,120 @@ export default function PendingPage() {
   };
 
   const markPaid = async (r: CustomerBalance, mode: 'cash' | 'online') => {
-    const amt = Number(r.outstanding);
-    if (!confirm(`Record a ₹${Math.round(amt)} ${mode} payment for ${r.customer_name}?\n\nThis clears the outstanding balance entirely.`)) return;
+    const totalToPay = Number(r.outstanding);
+    if (totalToPay <= 0) {
+      setToast({ message: 'Nothing outstanding for this customer.', type: 'error' });
+      return;
+    }
+    if (!confirm(`Record a ₹${Math.round(totalToPay)} ${mode} payment for ${r.customer_name}?\n\nThis clears the outstanding balance entirely.`)) return;
     setMarkingPaid(r.customer_id);
 
     const today = new Date().toISOString().slice(0, 10);
-    const { error } = await supabase.from('payments').insert({
-      customer_id: r.customer_id,
-      amount: amt,
-      mode,
-      payment_date: today,
-      notes: 'cleared from pending list',
-    });
 
+    // Pull this customer's bills + their existing payments so we can distribute
+    // the new payment across unpaid bills FIFO (oldest first). Each cheque /
+    // cash receipt then maps to specific bills, which makes the Deliveries
+    // page's "Paid" filter work correctly.
+    const [{ data: bills, error: billsErr }, { data: existingPays, error: paysErr }] = await Promise.all([
+      supabase
+        .from('sales_transactions')
+        .select('id, net_amount, delivery_date')
+        .eq('customer_id', r.customer_id)
+        .order('delivery_date', { ascending: true }),
+      supabase
+        .from('payments')
+        .select('sales_transaction_id, amount')
+        .eq('customer_id', r.customer_id),
+    ]);
+
+    if (billsErr || paysErr) {
+      setMarkingPaid(null);
+      setToast({ message: (billsErr || paysErr)!.message, type: 'error' });
+      return;
+    }
+
+    // Per-bill paid amounts from existing direct payments
+    const paidByBill = new Map<string, number>();
+    let customerLevelPool = 0;
+    for (const p of existingPays || []) {
+      if (p.sales_transaction_id) {
+        paidByBill.set(
+          p.sales_transaction_id,
+          (paidByBill.get(p.sales_transaction_id) || 0) + Number(p.amount),
+        );
+      } else {
+        customerLevelPool += Number(p.amount);
+      }
+    }
+
+    // Pre-allocate any customer-level pool across older bills first so we know
+    // real per-bill outstanding before distributing the new payment.
+    for (const b of bills || []) {
+      if (customerLevelPool <= 0) break;
+      const billOutstanding = Number(b.net_amount) - (paidByBill.get(b.id) || 0);
+      if (billOutstanding <= 0) continue;
+      const cover = Math.min(customerLevelPool, billOutstanding);
+      paidByBill.set(b.id, (paidByBill.get(b.id) || 0) + cover);
+      customerLevelPool -= cover;
+    }
+
+    // Now distribute the NEW payment across whatever's still outstanding
+    let remaining = totalToPay;
+    const paymentRows: Array<{
+      customer_id: string;
+      sales_transaction_id: string | null;
+      amount: number;
+      mode: 'cash' | 'online';
+      payment_date: string;
+      notes: string;
+    }> = [];
+    for (const b of bills || []) {
+      if (remaining <= 0.01) break;
+      const billOutstanding = Number(b.net_amount) - (paidByBill.get(b.id) || 0);
+      if (billOutstanding <= 0.01) continue;
+      const allocated = Math.min(remaining, billOutstanding);
+      paymentRows.push({
+        customer_id: r.customer_id,
+        sales_transaction_id: b.id,
+        amount: Number(allocated.toFixed(2)),
+        mode,
+        payment_date: today,
+        notes: 'cleared from pending list',
+      });
+      remaining -= allocated;
+    }
+
+    // Defensive: if there's still leftover (e.g. customer overpays vs known
+    // bills, or no bills exist), park it as a customer-level payment so the
+    // outstanding still goes to zero.
+    if (remaining > 0.01) {
+      paymentRows.push({
+        customer_id: r.customer_id,
+        sales_transaction_id: null,
+        amount: Number(remaining.toFixed(2)),
+        mode,
+        payment_date: today,
+        notes: 'cleared from pending list (no bill match)',
+      });
+    }
+
+    if (paymentRows.length === 0) {
+      setMarkingPaid(null);
+      setToast({ message: 'Nothing to allocate the payment to.', type: 'error' });
+      return;
+    }
+
+    const { error } = await supabase.from('payments').insert(paymentRows);
     setMarkingPaid(null);
     if (error) {
       setToast({ message: error.message, type: 'error' });
       return;
     }
-    setToast({ message: `Recorded ₹${Math.round(amt)} ${mode} payment.`, type: 'success' });
+    const linkedCount = paymentRows.filter((p) => p.sales_transaction_id).length;
+    setToast({
+      message: `Recorded ₹${Math.round(totalToPay)} ${mode} payment` + (linkedCount > 0 ? ` across ${linkedCount} bill${linkedCount === 1 ? '' : 's'}.` : '.'),
+      type: 'success',
+    });
     setRefreshing(true);
     fetchPending();
   };

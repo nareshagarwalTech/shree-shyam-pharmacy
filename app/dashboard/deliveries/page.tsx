@@ -22,6 +22,10 @@ import {
 type Row = SalesTransaction & {
   customer_name?: string;
   customer_id_resolved?: string;
+  /** Sum of payments.amount where sales_transaction_id = bill.id. Falls
+   *  back to the legacy customer_paid field if no direct payments exist. */
+  paid_amount: number;
+  balance_left_computed: number;
 };
 
 interface PaymentTarget {
@@ -52,14 +56,45 @@ export default function DeliveriesPage() {
       .limit(500);
     if (error) {
       setToast({ message: error.message, type: 'error' });
-    } else {
-      const flat = (data || []).map((r: any) => ({
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
+    // Pull payments in one query for all the bills we just fetched, so the
+    // "Paid" filter and the per-bill "balance left" reflect the actual
+    // payments table (not the legacy customer_paid field on the bill row).
+    const billIds = (data || []).map((r: any) => r.id).filter(Boolean);
+    let paidByBill = new Map<string, number>();
+    if (billIds.length) {
+      const { data: pays } = await supabase
+        .from('payments')
+        .select('sales_transaction_id, amount')
+        .in('sales_transaction_id', billIds);
+      for (const p of pays || []) {
+        if (!p.sales_transaction_id) continue;
+        paidByBill.set(
+          p.sales_transaction_id,
+          (paidByBill.get(p.sales_transaction_id) || 0) + Number(p.amount),
+        );
+      }
+    }
+
+    const flat: Row[] = (data || []).map((r: any) => {
+      const directPaid = paidByBill.get(r.id);
+      // Fallback for legacy bills that never got a payments-table row
+      // (e.g. /deliveries/new before migration 005 was applied).
+      const paid_amount = directPaid !== undefined ? directPaid : Number(r.customer_paid || 0);
+      const net = Number(r.net_amount || 0);
+      return {
         ...r,
         customer_name: r.customers?.name || r.customer_name_raw,
         customer_id_resolved: r.customers?.id || r.customer_id,
-      }));
-      setRows(flat);
-    }
+        paid_amount,
+        balance_left_computed: Math.max(0, net - paid_amount),
+      };
+    });
+    setRows(flat);
     setLoading(false);
     setRefreshing(false);
   }, []);
@@ -78,9 +113,9 @@ export default function DeliveriesPage() {
       );
     }
     if (filterPaid === 'pending') {
-      out = out.filter((r) => Number(r.net_amount || 0) - Number(r.customer_paid || 0) > 0);
+      out = out.filter((r) => r.balance_left_computed > 0.01);
     } else if (filterPaid === 'paid') {
-      out = out.filter((r) => Number(r.net_amount || 0) - Number(r.customer_paid || 0) <= 0);
+      out = out.filter((r) => r.balance_left_computed <= 0.01);
     }
     return out;
   }, [rows, searchQuery, filterPaid]);
@@ -88,7 +123,7 @@ export default function DeliveriesPage() {
   const totals = useMemo(() => ({
     count: filtered.length,
     billed: filtered.reduce((s, r) => s + Number(r.net_amount || 0), 0),
-    paid: filtered.reduce((s, r) => s + Number(r.customer_paid || 0), 0),
+    paid: filtered.reduce((s, r) => s + r.paid_amount, 0),
   }), [filtered]);
 
   const openPaymentForBill = async (r: Row) => {
@@ -112,7 +147,7 @@ export default function DeliveriesPage() {
       outstanding: Number(balance.outstanding),
       bills: (bills || []) as SalesTransaction[],
       defaultBillId: r.id,
-      defaultAmount: Math.max(0, Number(r.net_amount || 0) - Number(r.customer_paid || 0)) || undefined,
+      defaultAmount: Math.max(0, r.balance_left_computed) || undefined,
     });
   };
 
@@ -193,7 +228,7 @@ export default function DeliveriesPage() {
             {/* Mobile: card layout */}
             <div className="md:hidden space-y-2">
               {filtered.map((r) => {
-                const balanceLeft = Number(r.net_amount || 0) - Number(r.customer_paid || 0);
+                const balanceLeft = r.balance_left_computed;
                 return (
                   <div key={r.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-3">
                     <div className="flex items-start justify-between gap-2 mb-2">
@@ -223,7 +258,7 @@ export default function DeliveriesPage() {
                     {/* Payment summary */}
                     <div className="flex items-center justify-between gap-2 text-xs mb-2 bg-gray-50 rounded-md px-2 py-1.5">
                       <div>
-                        Paid <strong className="text-emerald-700">₹{Number(r.customer_paid || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
+                        Paid <strong className="text-emerald-700">₹{r.paid_amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</strong>
                         {r.payment_mode && (
                           <span className={`ml-1.5 inline-flex px-1.5 py-0.5 rounded-full text-[10px] font-semibold uppercase ${
                             r.payment_mode === 'cash' ? 'bg-emerald-100 text-emerald-700' :
@@ -283,7 +318,7 @@ export default function DeliveriesPage() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {filtered.map((r) => {
-                    const balanceLeft = Number(r.net_amount || 0) - Number(r.customer_paid || 0);
+                    const balanceLeft = r.balance_left_computed;
                     return (
                       <tr key={r.id} className="hover:bg-gray-50">
                         <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">{r.delivery_date ? formatDate(r.delivery_date) : '—'}</td>
@@ -301,7 +336,7 @@ export default function DeliveriesPage() {
                           ₹{Number(r.net_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                         </td>
                         <td className="px-4 py-2.5 text-right text-emerald-700">
-                          ₹{Number(r.customer_paid || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+                          ₹{r.paid_amount.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                         </td>
                         <td className="px-4 py-2.5 text-right text-amber-700">
                           ₹{Number(r.change_given || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
