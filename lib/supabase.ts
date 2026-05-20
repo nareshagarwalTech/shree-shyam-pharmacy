@@ -407,7 +407,12 @@ export type DailyEntryType =
 
 export interface DailyEntry {
   id: string;
+  /** Transaction date — when the sale/expense actually happened. */
   entry_date: string;                    // ISO date YYYY-MM-DD
+  /** When the bank credited the money (migration 018). Only meaningful for
+   *  POS/QR sales with delayed settlement. Defaults to entry_date in views
+   *  when NULL. */
+  settlement_date: string | null;
   entry_type: DailyEntryType;
   narration: string | null;
   txn_amount: number;
@@ -416,6 +421,10 @@ export interface DailyEntry {
   transfer_to_account_id: string | null;
   expense_category_id: string | null;
   sale_channel_id: string | null;
+  /** If set, this entry is an auto-created BANK CHARGES expense linked to a
+   *  SALE row (migration 018). The trigger keeps it in sync — do NOT edit
+   *  the row directly; edit the source sale instead. */
+  linked_sale_id: string | null;
   notes: string | null;
   created_at: string;
   updated_at: string;

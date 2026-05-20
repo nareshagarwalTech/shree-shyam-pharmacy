@@ -118,14 +118,16 @@ export default function DailyBookPage() {
     const channel = e.sale_channel_id ? channelById.get(e.sale_channel_id)?.name : null;
     const isCredit = e.entry_type === 'sale';
     const amountClass = isCredit ? 'text-emerald-700' : e.entry_type === 'expense' ? 'text-rose-700' : 'text-gray-800';
+    const isLinked = !!e.linked_sale_id;
 
-    return (
-      <button
-        key={e.id}
-        onClick={() => { setEditing(e); setModalOpen(true); }}
-        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3"
-      >
+    const inner = (
+      <>
         <span className={`text-[10px] font-bold px-2 py-1 rounded ${badge.cls}`}>{badge.label}</span>
+        {isLinked && (
+          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-violet-100 text-violet-700" title="Auto-managed from a sale. Edit the source sale to change.">
+            AUTO
+          </span>
+        )}
         <div className="flex-1 min-w-0">
           <div className="font-medium text-gray-900 text-sm truncate">
             {e.narration || <span className="text-gray-400 italic">(no narration)</span>}
@@ -135,6 +137,9 @@ export default function DailyBookPage() {
             {cat && <>📁 {cat}</>}
             {acct && <span className="ml-1">• {acct}</span>}
             {acct2 && <span> → {acct2}</span>}
+            {e.entry_type === 'sale' && e.settlement_date && e.settlement_date !== e.entry_date && (
+              <span className="ml-2 text-indigo-600">⏱ settles {e.settlement_date}</span>
+            )}
           </div>
         </div>
         <div className={`text-right font-semibold ${amountClass}`}>
@@ -143,6 +148,29 @@ export default function DailyBookPage() {
             <div className="text-xs font-normal text-gray-500">→ ₹{fmtINR(Number(e.settled_amount))}</div>
           )}
         </div>
+      </>
+    );
+
+    if (isLinked) {
+      // Read-only — clicking the source sale is the only way to modify this.
+      return (
+        <div
+          key={e.id}
+          className="w-full text-left px-4 py-3 border-b border-gray-100 last:border-0 flex items-center gap-3 bg-violet-50/30 cursor-not-allowed"
+          title="Auto-managed from a sale. Edit the source sale to change."
+        >
+          {inner}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        key={e.id}
+        onClick={() => { setEditing(e); setModalOpen(true); }}
+        className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 flex items-center gap-3"
+      >
+        {inner}
       </button>
     );
   }

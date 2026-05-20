@@ -51,6 +51,7 @@ export default function DailyEntryModal({
 
   // Form state
   const [entryDate, setEntryDate] = useState(defaultDate);
+  const [settlementDate, setSettlementDate] = useState('');
   const [entryType, setEntryType] = useState<DailyEntryType>('sale');
   const [narration, setNarration] = useState('');
   const [txnAmount, setTxnAmount] = useState('');
@@ -66,6 +67,7 @@ export default function DailyEntryModal({
     if (!open) return;
     if (entry) {
       setEntryDate(entry.entry_date);
+      setSettlementDate(entry.settlement_date ?? '');
       setEntryType(entry.entry_type);
       setNarration(entry.narration ?? '');
       setTxnAmount(String(entry.txn_amount ?? ''));
@@ -77,6 +79,7 @@ export default function DailyEntryModal({
       setNotes(entry.notes ?? '');
     } else {
       setEntryDate(defaultDate);
+      setSettlementDate('');
       setEntryType('sale');
       setNarration('');
       setTxnAmount('');
@@ -125,6 +128,7 @@ export default function DailyEntryModal({
 
     const payload: Partial<DailyEntry> = {
       entry_date: entryDate,
+      settlement_date: null,
       entry_type: entryType,
       narration: narration.trim() || null,
       txn_amount: amt,
@@ -147,7 +151,10 @@ export default function DailyEntryModal({
       if (selectedChannel?.has_commission && settledAmount) {
         const s = parseFloat(settledAmount);
         if (!Number.isFinite(s) || s < 0) { setError('Settled amount looks wrong.'); return; }
+        if (s > amt) { setError('Settled amount cannot exceed transaction amount.'); return; }
         payload.settled_amount = s;
+        // Settlement date only applies when there's a commission to track
+        if (settlementDate) payload.settlement_date = settlementDate;
       }
     } else if (entryType === 'expense') {
       if (!categoryId)    { setError('Pick an expense category.'); return; }
@@ -207,9 +214,12 @@ export default function DailyEntryModal({
         </div>
 
         <div className="px-6 py-5 space-y-5">
-          {/* Date */}
+          {/* Transaction Date */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Date</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              Transaction Date
+              <span className="text-xs text-gray-400 font-normal ml-2">when it happened</span>
+            </label>
             <input
               type="date"
               value={entryDate}
@@ -408,6 +418,39 @@ export default function DailyEntryModal({
               </div>
             )}
           </div>
+
+          {/* Settlement Date + bank charges preview — SALE with commission only */}
+          {entryType === 'sale' && selectedChannel?.has_commission && settledAmount && parseFloat(settledAmount) < parseFloat(txnAmount || '0') && (
+            <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Settlement Date
+                  <span className="text-xs text-gray-400 font-normal ml-2">when bank credited (defaults to transaction date)</span>
+                </label>
+                <input
+                  type="date"
+                  value={settlementDate || entryDate}
+                  onChange={(e) => setSettlementDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 bg-white"
+                />
+              </div>
+              {(() => {
+                const commission = parseFloat(txnAmount) - parseFloat(settledAmount);
+                const acct = accounts.find((a) => a.id === accountId);
+                return (
+                  <div className="text-xs space-y-1 text-gray-700 bg-white rounded px-3 py-2 border border-gray-200">
+                    <div>
+                      📥 <strong>{acct?.name || 'Bank'}</strong> credited <strong>₹{parseFloat(settledAmount).toLocaleString('en-IN')}</strong>
+                      &nbsp;on <strong>{settlementDate || entryDate}</strong>
+                    </div>
+                    <div>
+                      🧾 Auto-creates <strong>BANK CHARGES expense ₹{commission.toLocaleString('en-IN')}</strong> on same date
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
 
           {/* Notes */}
           <div>
