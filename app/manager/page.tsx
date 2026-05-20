@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   LogOut,
   ArrowLeft,
+  Wallet,
 } from 'lucide-react';
 import { PHARMACY_INFO } from '@/lib/constants';
 
@@ -73,6 +74,14 @@ const TILES: Tile[] = [
     icon: Landmark,
     iconBg: 'bg-purple-100',
     iconColor: 'text-purple-600',
+  },
+  {
+    href: '/manager/daily-book/accounts',
+    title: 'Accounts & Opening',
+    desc: 'Set per-account inception + monthly opening balances.',
+    icon: Wallet,
+    iconBg: 'bg-violet-100',
+    iconColor: 'text-violet-600',
   },
   {
     href: '/manager/daily-book/import',

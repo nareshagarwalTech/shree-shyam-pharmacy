@@ -431,6 +431,17 @@ export interface CashDenomination {
   created_at: string;
 }
 
+// Migration 017 — per-account, per-period opening balances
+export interface AccountOpeningBalance {
+  id: string;
+  account_id: string;
+  effective_date: string;                // ISO date — balance "as of start of this day"
+  amount: number;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Views (computed)
 
 export interface DailyBookSalesSummary {
@@ -484,8 +495,16 @@ export interface DailyBookAccountBalance {
   account_short_name: string | null;
   account_kind: AccountKind;
   opening_balance: number;
-  lifetime_net: number;
+  /** Most recent monthly opening balance amount, if any (migration 017). */
+  monthly_opening_amount: number | null;
+  /** Effective date of the most recent monthly opening (migration 017). */
+  monthly_opening_date: string | null;
+  /** Sum of movements since the baseline date (monthly opening or inception). */
+  movements_since_baseline: number;
+  /** Computed current balance using the baseline. */
   current_balance: number;
+  /** Total lifetime movement (all entries, ignoring monthly openings). Kept for compatibility. */
+  lifetime_net: number;
   is_active: boolean;
   sort_order: number;
 }
