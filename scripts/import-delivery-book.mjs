@@ -9,10 +9,29 @@
  * Run AFTER applying migration 003.
  *   node scripts/import-delivery-book.mjs
  */
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+
+// Excel 1900 date system → JS Date (replaces xlsx.SSF.parse_date_code).
+function excelSerialToDate(serial) {
+  return new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000);
+}
+
+// ExcelJS cell.value → Date | number | string. Unwraps formulas.
+function readCell(cell) {
+  const v = cell.value;
+  if (v == null) return '';
+  if (v instanceof Date) return v;
+  if (typeof v === 'number' || typeof v === 'string') return v;
+  if (typeof v === 'object' && 'result' in v && v.result != null) {
+    const r = v.result;
+    if (r instanceof Date || typeof r === 'number') return r;
+    return String(r);
+  }
+  return cell.text ?? '';
+}
 
 const FILE = 'C:/Users/nares/OneDrive/Documents/Shyam/DELIVERYBOOK_SSP.xlsx';
 
@@ -53,8 +72,7 @@ function parseDate(raw) {
     return raw.toISOString().slice(0, 10);
   }
   if (typeof raw === 'number') {
-    const d = XLSX.SSF.parse_date_code(raw);
-    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d)).toISOString().slice(0, 10);
+    return excelSerialToDate(raw).toISOString().slice(0, 10);
   }
   if (!raw) return null;
   const s = String(raw).trim();
@@ -103,40 +121,37 @@ function deriveFeedNo(billLabel, phone, deliveryDateISO) {
 // ---------------------------------------------------------------------------
 // Read the sheet — header is at row 3 (1-indexed); data starts row 4
 // ---------------------------------------------------------------------------
-function readDeliverySheet() {
-  const wb = XLSX.read(fs.readFileSync(FILE), { cellDates: true });
-  const sheet = wb.Sheets['Deliveries'];
+async function readDeliverySheet() {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(FILE);
+  const sheet = wb.getWorksheet('Deliveries');
   if (!sheet) throw new Error('Sheet "Deliveries" not found');
 
-  // Get raw rows; skip the first 2 banner rows + header row (= 3)
-  const all = XLSX.utils.sheet_to_json(sheet, { defval: '', raw: false, header: 1 });
-
-  // Header is row index 2 (0-indexed). Map __EMPTY → real label.
-  const headerRow = all[2];
-  // Header columns (in order): A..P
-  // 0: S.No  1: Date  2: Bill No  3: Customer Name  4: Unique Key
-  // 5: Phone 6: Bill Amt  7: Prev Pending  8: Total Due
-  // 9: Change to Give Boy  10: Mode  11: Customer Pays
-  // 12: Balance Left  13: Payment Date  14: PendingMark  15: RunCount
+  // Read all rows as an array-of-arrays (1-indexed, like exceljs).
+  // Header banner spans rows 1-2; the real column header is row 3; data starts row 4.
+  // Column layout (1-indexed): 1:S.No 2:Date 3:Bill No 4:Customer Name 5:Unique Key
+  // 6:Phone 7:Bill Amt 8:Prev Pending 9:Total Due 10:Change to Give Boy 11:Mode
+  // 12:Customer Pays 13:Balance Left 14:Payment Date 15:PendingMark 16:RunCount
+  const rowCount = sheet.rowCount;
 
   const out = [];
-  for (let i = 3; i < all.length; i++) {
-    const row = all[i];
-    if (!row || !row.length) continue;
-    const sno = row[0];
-    const dateRaw = row[1];
-    const billLabel = String(row[2] || '').trim();
-    const customerNameRaw = String(row[3] || '').trim();
-    const uniqueKey = String(row[4] || '').trim();
-    const phoneRaw = String(row[5] || '').trim();
-    const billAmt = parseRupees(row[6]);
-    const prevPending = parseRupees(row[7]);
-    const totalDue = parseRupees(row[8]);
-    const changeGiven = parseRupees(row[9]);
-    const modeRaw = String(row[10] || '').trim().toLowerCase();
-    const customerPaid = parseRupees(row[11]);
-    const balanceLeft = parseRupees(row[12]);
-    const paymentDateRaw = row[13];
+  for (let i = 4; i <= rowCount; i++) {
+    const row = sheet.getRow(i);
+    if (!row || row.cellCount === 0) continue;
+    const sno = readCell(row.getCell(1));
+    const dateRaw = readCell(row.getCell(2));
+    const billLabel = String(readCell(row.getCell(3)) || '').trim();
+    const customerNameRaw = String(readCell(row.getCell(4)) || '').trim();
+    const uniqueKey = String(readCell(row.getCell(5)) || '').trim();
+    const phoneRaw = String(readCell(row.getCell(6)) || '').trim();
+    const billAmt = parseRupees(readCell(row.getCell(7)));
+    const prevPending = parseRupees(readCell(row.getCell(8)));
+    const totalDue = parseRupees(readCell(row.getCell(9)));
+    const changeGiven = parseRupees(readCell(row.getCell(10)));
+    const modeRaw = String(readCell(row.getCell(11)) || '').trim().toLowerCase();
+    const customerPaid = parseRupees(readCell(row.getCell(12)));
+    const balanceLeft = parseRupees(readCell(row.getCell(13)));
+    const paymentDateRaw = readCell(row.getCell(14));
 
     if (sno === 'TOTALS' || customerNameRaw === '' || customerNameRaw === 'TOTALS') continue;
 
@@ -240,7 +255,7 @@ async function main() {
 
   // 2. Read sheet
   console.log(`📂  Reading ${FILE}`);
-  const rows = readDeliverySheet();
+  const rows = await readDeliverySheet();
   console.log(`   → ${rows.length} delivery rows parsed`);
 
   if (!rows.length) {

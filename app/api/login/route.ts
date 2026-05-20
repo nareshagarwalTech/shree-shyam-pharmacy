@@ -3,27 +3,31 @@ import { NextResponse } from 'next/server';
 /**
  * POST /api/login
  *
- * Compares the supplied password against APP_PASSWORD on the server.
- * The password lives in a non-NEXT_PUBLIC env var, so it is not in
- * the JS bundle. Successful login sets a small JSON cookie that the
- * client uses for "am I logged in?" checks.
+ * Body: { password: string, tier?: 'staff' | 'manager' }
  *
- * This is a single-pharmacy app with one shared password — not a
- * multi-tenant identity system. There is no rate limiting; rely on
- * Vercel's edge protections + HTTPS.
+ * Compares the supplied password against either APP_PASSWORD (staff, default)
+ * or MANAGER_PASSWORD (manager tier) on the server. Both passwords live in
+ * non-NEXT_PUBLIC env vars and are NOT shipped in the JS bundle.
+ *
+ * This is a single-pharmacy app with two shared passwords (staff + manager).
+ * Not a multi-tenant identity system. No rate limiting; relies on HTTPS +
+ * platform edge protections.
  */
 export async function POST(req: Request) {
-  let body: { password?: string } = {};
+  let body: { password?: string; tier?: 'staff' | 'manager' } = {};
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ ok: false, error: 'Bad request' }, { status: 400 });
   }
 
-  const expected = process.env.APP_PASSWORD;
+  const tier = body.tier === 'manager' ? 'manager' : 'staff';
+  const envVar = tier === 'manager' ? 'MANAGER_PASSWORD' : 'APP_PASSWORD';
+  const expected = process.env[envVar];
+
   if (!expected) {
     return NextResponse.json(
-      { ok: false, error: 'Server is missing APP_PASSWORD env var' },
+      { ok: false, error: `Server is missing ${envVar} env var` },
       { status: 500 },
     );
   }
@@ -32,5 +36,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Incorrect password' }, { status: 401 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, tier });
 }

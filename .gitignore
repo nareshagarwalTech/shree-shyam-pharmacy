@@ -36,3 +36,6 @@ next-env.d.ts
 # IDE
 .vscode/
 .idea/
+
+# Claude Code (personal overrides — team settings live in .claude/settings.json if added)
+.claude/settings.local.json

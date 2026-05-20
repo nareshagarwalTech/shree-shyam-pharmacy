@@ -17,10 +17,61 @@
  * Run:   node scripts/import-master-data.mjs
  */
 
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient } from '@supabase/supabase-js';
+
+// Excel 1900 date system → JS Date (replaces xlsx.SSF.parse_date_code).
+function excelSerialToDate(serial) {
+  return new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000);
+}
+
+// ExcelJS cell.value → Date | number | string. Unwraps formulas; uses cell.text
+// as the fallback so display-formatted strings come through unchanged.
+function readCell(cell) {
+  const v = cell.value;
+  if (v == null) return '';
+  if (v instanceof Date) return v;
+  if (typeof v === 'number' || typeof v === 'string') return v;
+  if (typeof v === 'object' && 'result' in v && v.result != null) {
+    const r = v.result;
+    if (r instanceof Date || typeof r === 'number') return r;
+    return String(r);
+  }
+  return cell.text ?? '';
+}
+
+// Load workbook from file path, return first (or named) worksheet as
+// array of objects keyed by header row. Mirrors xlsx.utils.sheet_to_json.
+async function loadSheetAsObjects(filePath, sheetName) {
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.readFile(filePath);
+  const sheet = sheetName ? wb.getWorksheet(sheetName) : wb.worksheets[0];
+  if (!sheet) throw new Error(`Sheet ${sheetName ?? '(first)'} not found in ${filePath}`);
+
+  const headerRow = sheet.getRow(1);
+  const header = [];
+  headerRow.eachCell({ includeEmpty: false }, (cell, col) => {
+    header[col - 1] = String(cell.text ?? '').trim();
+  });
+
+  const rows = [];
+  sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+    if (rowNum === 1) return;
+    const obj = {};
+    let hasValue = false;
+    for (let col = 1; col <= header.length; col++) {
+      const key = header[col - 1];
+      if (!key) continue;
+      const val = readCell(row.getCell(col));
+      obj[key] = val;
+      if (val !== '' && val != null) hasValue = true;
+    }
+    if (hasValue) rows.push(obj);
+  });
+  return rows;
+}
 
 // ---------------------------------------------------------------------------
 // Config
@@ -126,12 +177,7 @@ function parseFeedDate(raw) {
         return raw.toISOString().slice(0, 10);
     }
     if (typeof raw === 'number') {
-        // Excel serial date
-        const d = XLSX.SSF.parse_date_code(raw);
-        if (d) {
-            const iso = new Date(Date.UTC(d.y, d.m - 1, d.d));
-            return iso.toISOString().slice(0, 10);
-        }
+        return excelSerialToDate(raw).toISOString().slice(0, 10);
     }
     if (!raw) return null;
     const s = String(raw).trim();
@@ -150,10 +196,9 @@ function parseFeedDate(raw) {
 // ---------------------------------------------------------------------------
 // Read Excel files
 // ---------------------------------------------------------------------------
-function readMaster() {
+async function readMaster() {
     console.log(`📂  Reading master: ${MASTER_FILE}`);
-    const wb = XLSX.read(fs.readFileSync(MASTER_FILE), { cellDates: true });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+    const rows = await loadSheetAsObjects(MASTER_FILE);
     const out = [];
     const seen = new Set();
     for (const r of rows) {
@@ -168,12 +213,11 @@ function readMaster() {
     return out;
 }
 
-function readSales() {
+async function readSales() {
     const all = new Map();   // feed_no → sale
     for (const file of SALES_FILES) {
         console.log(`📂  Reading sales:  ${file}`);
-        const wb = XLSX.read(fs.readFileSync(file), { cellDates: true });
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false });
+        const rows = await loadSheetAsObjects(file);
         for (const r of rows) {
             const feedNo = String(r.FeedNo || '').trim();
             if (!feedNo) continue;
@@ -437,7 +481,7 @@ async function main() {
         filename: 'CUSCELLDATA.xlsx', source_type: 'master_customers',
     }).select().single();
 
-    const masterRows = readMaster();
+    const masterRows = await readMaster();
     const mStats = await importMaster(masterRows, masterBatch.data?.id);
     await supabase.from('import_batches').update({
         row_count:     masterRows.length,
@@ -451,7 +495,7 @@ async function main() {
         filename: 'CUSTOMERREMINDER + REMINDER DATA.xlsx', source_type: 'daily_sales',
     }).select().single();
 
-    const salesRows = readSales();
+    const salesRows = await readSales();
     const sStats = await importSales(salesRows, salesBatch.data?.id);
     await supabase.from('import_batches').update({
         row_count:     salesRows.length,

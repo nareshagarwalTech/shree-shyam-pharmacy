@@ -1,11 +1,16 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
   title: 'Shree Shyam Pharmacy | Your Trusted Neighbourhood Pharmacy in Hyderabad',
   description: 'Quality medicines at affordable prices with home delivery in Kukatpally, Hyderabad. Order via WhatsApp!',
+};
+
+export const viewport: Viewport = {
   themeColor: '#10b981',
-  viewport: 'width=device-width, initial-scale=1, viewport-fit=cover',
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({

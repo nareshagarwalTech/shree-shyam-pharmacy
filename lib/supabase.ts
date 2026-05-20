@@ -358,3 +358,163 @@ export interface ChequeDepositScheduleRow {
   }>;
 }
 
+// ---------------------------------------------------------------------------
+// Daily Book module — migration 016 (manager-only feature)
+// ---------------------------------------------------------------------------
+
+export type AccountKind = 'cash' | 'bank' | 'pos' | 'qr' | 'other';
+
+export interface Account {
+  id: string;
+  name: string;
+  short_name: string | null;
+  kind: AccountKind;
+  opening_balance: number;
+  sort_order: number;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ExpenseCategory {
+  id: string;
+  name: string;
+  slug: string;
+  sort_order: number;
+  is_credit_note: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface SaleChannel {
+  id: string;
+  name: string;
+  slug: string;
+  default_account_id: string | null;
+  has_commission: boolean;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type DailyEntryType =
+  | 'sale'
+  | 'expense'
+  | 'cash_count'
+  | 'bank_transfer'
+  | 'cash_deposit';
+
+export interface DailyEntry {
+  id: string;
+  entry_date: string;                    // ISO date YYYY-MM-DD
+  entry_type: DailyEntryType;
+  narration: string | null;
+  txn_amount: number;
+  settled_amount: number | null;
+  account_id: string | null;
+  transfer_to_account_id: string | null;
+  expense_category_id: string | null;
+  sale_channel_id: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface CashDenomination {
+  id: string;
+  count_date: string;                    // ISO date
+  denomination: 500 | 200 | 100 | 50 | 20 | 10 | 5 | 2 | 1;
+  count: number;
+  daily_entry_id: string | null;
+  created_at: string;
+}
+
+// Views (computed)
+
+export interface DailyBookSalesSummary {
+  entry_date: string;
+  pos_txn: number;
+  pos_settled: number;
+  pos_commission: number;
+  qr_txn: number;
+  qr_settled: number;
+  qr_commission: number;
+  online_amt: number;
+  credit_amt: number;
+  cash_sales: number;
+  total_sales: number;
+  entry_count: number;
+}
+
+export interface DailyBookExpenseSummary {
+  entry_date: string;
+  purchase: number;
+  salary: number;
+  rent: number;
+  electricity: number;
+  transport: number;
+  diesel: number;
+  home_expenses: number;
+  bank_charges: number;
+  other: number;
+  clearing: number;
+  total_expense: number;
+  cr_note: number;
+  net_expense: number;
+}
+
+export interface DailyBookBankLedgerRow {
+  account_id: string;
+  account_name: string;
+  account_short_name: string | null;
+  account_kind: AccountKind;
+  entry_date: string;
+  total_credit: number;
+  total_debit: number;
+  net_change: number;
+  opening_bal: number | null;
+  closing_bal: number;
+}
+
+export interface DailyBookAccountBalance {
+  account_id: string;
+  account_name: string;
+  account_short_name: string | null;
+  account_kind: AccountKind;
+  opening_balance: number;
+  lifetime_net: number;
+  current_balance: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface DailyBookClosingBalance {
+  entry_date: string;
+  opening_cash: number;
+  cash_sales: number;
+  cash_expenses: number;
+  cash_cr_note: number;
+  cash_deposits_out: number;
+  actual_cash: number | null;
+  expected_cash: number;
+  cash_diff: number | null;
+}
+
+export interface DailyBookPaymentReconciliation {
+  entry_date: string;
+  daily_book_cash: number;
+  payments_cash: number;
+  cash_diff: number;
+  daily_book_online: number;
+  payments_online: number;
+  online_diff: number;
+  daily_book_pos_qr: number;
+  payments_pos_qr: number;
+  pos_qr_diff: number;
+  daily_book_total: number;
+  payments_total: number;
+  total_diff: number;
+}
+

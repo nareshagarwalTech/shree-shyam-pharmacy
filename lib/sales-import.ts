@@ -1,4 +1,10 @@
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
+
+// Excel 1900 date system → JS Date (replaces xlsx.SSF.parse_date_code).
+// Dec 30 1899 is the anchor that correctly handles Excel's 1900-leap-year bug.
+function excelSerialToDate(serial: number): Date {
+  return new Date(Date.UTC(1899, 11, 30) + serial * 86_400_000);
+}
 
 export interface ParsedSale {
   feed_no: string;
@@ -63,8 +69,7 @@ export function parseFeedDate(raw: any): string | null {
     return raw.toISOString().slice(0, 10);
   }
   if (typeof raw === 'number') {
-    const d = XLSX.SSF.parse_date_code(raw);
-    if (d) return new Date(Date.UTC(d.y, d.m - 1, d.d)).toISOString().slice(0, 10);
+    return excelSerialToDate(raw).toISOString().slice(0, 10);
   }
   if (!raw) return null;
   const s = String(raw).trim();
@@ -96,20 +101,67 @@ export function titleCase(s: string): string {
     .join(' ');
 }
 
+// Unwrap an ExcelJS cell.value into the form sales-import expects (Date | number | string).
+// - Date cells → Date object
+// - Numeric cells → number
+// - Formula cells → unwrap .result
+// - Everything else → cell.text (the formatted display string)
+function readCell(cell: ExcelJS.Cell): Date | number | string {
+  const v = cell.value;
+  if (v == null) return '';
+  if (v instanceof Date) return v;
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string') return v;
+  if (typeof v === 'object' && 'result' in v && v.result != null) {
+    const r = v.result;
+    if (r instanceof Date) return r;
+    if (typeof r === 'number') return r;
+    return String(r);
+  }
+  return cell.text ?? '';
+}
+
+function sheetRowsToObjects(sheet: ExcelJS.Worksheet): {
+  header: string[];
+  rows: Array<Record<string, Date | number | string>>;
+} {
+  const headerRow = sheet.getRow(1);
+  const header: string[] = [];
+  headerRow.eachCell({ includeEmpty: false }, (cell, col) => {
+    header[col - 1] = String(cell.text ?? '').trim();
+  });
+
+  const rows: Array<Record<string, Date | number | string>> = [];
+  sheet.eachRow({ includeEmpty: false }, (row, rowNum) => {
+    if (rowNum === 1) return;
+    const obj: Record<string, Date | number | string> = {};
+    let hasValue = false;
+    for (let col = 1; col <= header.length; col++) {
+      const key = header[col - 1];
+      if (!key) continue;
+      const cellVal = readCell(row.getCell(col));
+      obj[key] = cellVal;
+      if (cellVal !== '' && cellVal != null) hasValue = true;
+    }
+    if (hasValue) rows.push(obj);
+  });
+  return { header, rows };
+}
+
 export async function parseSalesFile(file: File): Promise<SalesParseResult> {
   const buffer = await file.arrayBuffer();
-  const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
-  const sheet = wb.Sheets[wb.SheetNames[0]];
-  const rawRows = XLSX.utils.sheet_to_json<Record<string, any>>(sheet, {
-    defval: '',
-    raw: false,
-  });
+  const wb = new ExcelJS.Workbook();
+  await wb.xlsx.load(buffer);
+  const sheet = wb.worksheets[0];
+  if (!sheet) {
+    return { rows: [], errors: [{ row: 0, message: 'Workbook has no sheets' }], fileName: file.name, totalRowsInSheet: 0 };
+  }
+
+  const { header, rows: rawRows } = sheetRowsToObjects(sheet);
 
   if (rawRows.length === 0) {
     return { rows: [], errors: [{ row: 0, message: 'Sheet is empty' }], fileName: file.name, totalRowsInSheet: 0 };
   }
-
-  const header = Object.keys(rawRows[0]);
   const headerMap = mapHeader(header);
 
   // Required
@@ -154,8 +206,8 @@ export async function parseSalesFile(file: File): Promise<SalesParseResult> {
       customer_phone: phone,
       customer_name_raw: titleCase(String(r[headerMap.customer_name_raw!] || '').trim()),
       address_raw: headerMap.address_raw ? String(r[headerMap.address_raw] || '').trim() || null : null,
-      net_amount: headerMap.net_amount ? parseFloat(r[headerMap.net_amount]) || null : null,
-      for_days: headerMap.for_days ? parseInt(r[headerMap.for_days], 10) || null : null,
+      net_amount: headerMap.net_amount ? parseFloat(String(r[headerMap.net_amount])) || null : null,
+      for_days: headerMap.for_days ? parseInt(String(r[headerMap.for_days]), 10) || null : null,
       raw_row: rowNum,
     });
   });
