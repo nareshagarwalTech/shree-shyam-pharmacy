@@ -14,9 +14,26 @@ import {
 } from '@/lib/supabase';
 import {
   ArrowLeft, Plus, RefreshCw, Calendar,
-  TrendingUp, TrendingDown, Wallet, Briefcase, Home,
+  TrendingUp, Wallet, Briefcase, Home,
+  Landmark, ArrowRight, Settings,
 } from 'lucide-react';
 import DailyEntryModal from '@/components/DailyEntryModal';
+
+interface BalanceRow {
+  account_id: string;
+  account_name: string;
+  account_short_name: string | null;
+  account_kind: string;
+  inception_opening: number | string;
+  monthly_opening_amount: number | string | null;
+  monthly_opening_date: string | null;
+  opening_today: number | string;
+  credit_today: number | string;
+  debit_today: number | string;
+  net_today: number | string;
+  closing_today: number | string;
+  sort_order: number;
+}
 
 function todayISO() {
   const d = new Date();
@@ -52,6 +69,7 @@ export default function DailyBookPage() {
   const [accounts, setAccounts]   = useState<Account[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [modes, setModes]         = useState<PaymentMode[]>([]);
+  const [balances, setBalances]   = useState<BalanceRow[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -74,12 +92,16 @@ export default function DailyBookPage() {
 
   const loadEntries = useCallback(async () => {
     setRefreshing(true);
-    const { data } = await supabase
-      .from('daily_entries')
-      .select('*')
-      .eq('entry_date', date)
-      .order('created_at', { ascending: false });
-    setEntries((data ?? []) as DailyEntry[]);
+    const [entriesRes, balancesRes] = await Promise.all([
+      supabase
+        .from('daily_entries')
+        .select('*')
+        .eq('entry_date', date)
+        .order('created_at', { ascending: false }),
+      supabase.rpc('daily_book_balances_on', { p_date: date }),
+    ]);
+    setEntries((entriesRes.data ?? []) as DailyEntry[]);
+    setBalances((balancesRes.data ?? []) as BalanceRow[]);
     setRefreshing(false);
   }, [date]);
 
@@ -235,6 +257,106 @@ export default function DailyBookPage() {
               <Plus className="w-4 h-4" /> New Entry
             </button>
           </div>
+        </div>
+
+        {/* First-time setup callout — shown when ALL accounts have zero inception opening
+            AND no monthly opening has been set yet. */}
+        {!loading && balances.length > 0 &&
+          balances.every((b) => Number(b.inception_opening) === 0 && b.monthly_opening_amount == null) && (
+          <div className="bg-gradient-to-r from-violet-50 to-indigo-50 border-2 border-dashed border-violet-300 rounded-2xl p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 bg-violet-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Wallet className="w-6 h-6 text-violet-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="font-display font-bold text-gray-900">👋 First time? Start with your Opening Balances.</h3>
+                <p className="text-sm text-gray-600 mt-1 leading-snug">
+                  Tell the system how much money was in each account when you started using it.
+                  Without this, balances start from ₹0 and any expenses will make them go negative.
+                </p>
+                <Link
+                  href="/manager/daily-book/accounts"
+                  className="inline-flex items-center gap-1.5 mt-3 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+                >
+                  <Settings className="w-4 h-4" /> Set Opening Balances
+                  <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account Balances panel — Opening / Movements / Closing per account for selected day */}
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-violet-50/50 to-transparent flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Landmark className="w-4 h-4 text-violet-600" />
+              <div>
+                <div className="font-semibold text-gray-900 text-sm">Account Balances</div>
+                <div className="text-xs text-gray-500">for {date}</div>
+              </div>
+            </div>
+            <Link
+              href="/manager/daily-book/accounts"
+              className="text-xs text-violet-600 hover:text-violet-700 inline-flex items-center gap-1"
+              title="Set opening balances"
+            >
+              <Settings className="w-3.5 h-3.5" /> Set Opening
+            </Link>
+          </div>
+          {loading ? (
+            <div className="py-6 text-center text-gray-400 text-sm">Loading…</div>
+          ) : balances.length === 0 ? (
+            <div className="py-6 text-center text-gray-400 text-sm">No active accounts.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left  px-3 py-2 font-semibold text-gray-700">Account</th>
+                    <th className="text-right px-3 py-2 font-semibold text-gray-700">Opening</th>
+                    <th className="text-right px-3 py-2 font-semibold text-emerald-700">+ Credit</th>
+                    <th className="text-right px-3 py-2 font-semibold text-rose-700">− Debit</th>
+                    <th className="text-right px-3 py-2 font-semibold text-gray-700">Closing</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balances.map((b) => {
+                    const opening = Number(b.opening_today);
+                    const credit = Number(b.credit_today);
+                    const debit = Number(b.debit_today);
+                    const closing = Number(b.closing_today);
+                    const negative = closing < 0;
+                    return (
+                      <tr key={b.account_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <td className="px-3 py-2.5">
+                          <div className="font-medium text-gray-900">{b.account_name}</div>
+                          {b.monthly_opening_date && (
+                            <div className="text-[10px] text-violet-600">
+                              monthly opening since {b.monthly_opening_date}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">₹{fmtINR(opening)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                          {credit > 0 ? '+₹' + fmtINR(credit) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-rose-700">
+                          {debit > 0 ? '−₹' + fmtINR(debit) : '—'}
+                        </td>
+                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${negative ? 'text-rose-700' : 'text-gray-900'}`}>
+                          ₹{fmtINR(closing)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              <div className="px-3 py-2 text-[11px] text-gray-500 bg-gray-50 border-t border-gray-200">
+                💡 Closing of {date} becomes opening of the next day automatically.
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 4-bucket stats */}

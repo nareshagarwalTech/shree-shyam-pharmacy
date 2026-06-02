@@ -504,6 +504,6 @@ JOIN categories c    ON c.id = de.category_id
 JOIN payment_modes pm ON pm.id = de.mode_id
 WHERE de.txn_type = 'entry'
 GROUP BY de.entry_date, de.direction, de.scope,
-         de.category_id, c.name, c.slug,
-         de.mode_id, pm.name
+         de.category_id, c.name, c.slug, c.sort_order,
+         de.mode_id, pm.name, pm.sort_order
 ORDER BY de.entry_date DESC, de.direction, de.scope, c.sort_order, pm.sort_order;
