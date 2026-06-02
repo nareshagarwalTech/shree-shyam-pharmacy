@@ -401,8 +401,14 @@ export default function DailyBookPage() {
                     const remaining = Number(f.current_balance);
                     const negative = remaining < 0;
                     return (
-                      <tr key={f.category_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
-                        <td className="px-3 py-2.5 font-medium text-gray-900">📌 {f.category_name}</td>
+                      <tr key={f.category_id} className="border-b border-gray-100 last:border-0 hover:bg-violet-50/40 cursor-pointer"
+                          onClick={() => { window.location.href = `/manager/daily-book/funds/${f.category_id}`; }}
+                          title="Click to see breakdown by mode + account + chronological entries">
+                        <td className="px-3 py-2.5 font-medium text-gray-900">
+                          <Link href={`/manager/daily-book/funds/${f.category_id}`} className="hover:text-violet-700">
+                            📌 {f.category_name}
+                          </Link>
+                        </td>
                         <td className="px-3 py-2.5 text-xs">
                           <span className={`px-1.5 py-0.5 rounded ${f.scope === 'business' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
                             {f.scope}
