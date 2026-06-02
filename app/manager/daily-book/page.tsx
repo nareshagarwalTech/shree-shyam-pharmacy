@@ -11,11 +11,12 @@ import {
   EntryDirection,
   EntryScope,
   TxnType,
+  FundBalance,
 } from '@/lib/supabase';
 import {
   ArrowLeft, Plus, RefreshCw, Calendar,
   TrendingUp, Wallet, Briefcase, Home,
-  Landmark, ArrowRight, Settings,
+  Landmark, ArrowRight, Settings, Coins,
 } from 'lucide-react';
 import DailyEntryModal from '@/components/DailyEntryModal';
 
@@ -70,6 +71,7 @@ export default function DailyBookPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [modes, setModes]         = useState<PaymentMode[]>([]);
   const [balances, setBalances]   = useState<BalanceRow[]>([]);
+  const [funds, setFunds]         = useState<FundBalance[]>([]);
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -92,16 +94,21 @@ export default function DailyBookPage() {
 
   const loadEntries = useCallback(async () => {
     setRefreshing(true);
-    const [entriesRes, balancesRes] = await Promise.all([
+    const [entriesRes, balancesRes, fundsRes] = await Promise.all([
       supabase
         .from('daily_entries')
         .select('*')
         .eq('entry_date', date)
         .order('created_at', { ascending: false }),
       supabase.rpc('daily_book_balances_on', { p_date: date }),
+      supabase
+        .from('daily_book_fund_balances')
+        .select('*')
+        .eq('is_active', true),
     ]);
     setEntries((entriesRes.data ?? []) as DailyEntry[]);
     setBalances((balancesRes.data ?? []) as BalanceRow[]);
+    setFunds((fundsRes.data ?? []) as FundBalance[]);
     setRefreshing(false);
   }, [date]);
 
@@ -358,6 +365,70 @@ export default function DailyBookPage() {
             </div>
           )}
         </div>
+
+        {/* Fund Balances panel — only when at least one active shared category exists */}
+        {!loading && funds.length > 0 && (
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-200 bg-gradient-to-r from-violet-50/50 to-transparent flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="w-4 h-4 text-violet-600" />
+                <div>
+                  <div className="font-semibold text-gray-900 text-sm">Fund Balances</div>
+                  <div className="text-xs text-gray-500">running balance per shared category</div>
+                </div>
+              </div>
+              <Link
+                href="/manager/daily-book/categories"
+                className="text-xs text-violet-600 hover:text-violet-700 inline-flex items-center gap-1"
+              >
+                <Settings className="w-3.5 h-3.5" /> Manage Funds
+              </Link>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left  px-3 py-2 font-semibold text-gray-700">Fund</th>
+                    <th className="text-left  px-3 py-2 font-semibold text-gray-700">Scope</th>
+                    <th className="text-right px-3 py-2 font-semibold text-emerald-700">In</th>
+                    <th className="text-right px-3 py-2 font-semibold text-rose-700">Out</th>
+                    <th className="text-right px-3 py-2 font-semibold text-gray-700">Remaining</th>
+                    <th className="text-left  px-3 py-2 font-semibold text-gray-700 hidden sm:table-cell">Last activity</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funds.map((f) => {
+                    const remaining = Number(f.current_balance);
+                    const negative = remaining < 0;
+                    return (
+                      <tr key={f.category_id} className="border-b border-gray-100 last:border-0 hover:bg-gray-50">
+                        <td className="px-3 py-2.5 font-medium text-gray-900">📌 {f.category_name}</td>
+                        <td className="px-3 py-2.5 text-xs">
+                          <span className={`px-1.5 py-0.5 rounded ${f.scope === 'business' ? 'bg-amber-100 text-amber-700' : 'bg-violet-100 text-violet-700'}`}>
+                            {f.scope}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-emerald-700">
+                          {Number(f.total_in) > 0 ? '+₹' + fmtINR(Number(f.total_in)) : '—'}
+                        </td>
+                        <td className="px-3 py-2.5 text-right tabular-nums text-rose-700">
+                          {Number(f.total_out) > 0 ? '−₹' + fmtINR(Number(f.total_out)) : '—'}
+                        </td>
+                        <td className={`px-3 py-2.5 text-right font-bold tabular-nums ${negative ? 'text-rose-700' : remaining === 0 ? 'text-gray-400' : 'text-violet-700'}`}>
+                          ₹{fmtINR(remaining)}
+                        </td>
+                        <td className="px-3 py-2.5 text-xs text-gray-500 hidden sm:table-cell">
+                          {f.last_activity_date ?? <span className="text-gray-400">—</span>}
+                          {f.entry_count > 0 && <span className="ml-2 text-gray-400">({f.entry_count} entries)</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* 4-bucket stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

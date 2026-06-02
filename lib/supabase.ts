@@ -384,9 +384,14 @@ export interface Account {
 // Daily Book v2 — migration 019 (redesign: Direction × Scope model)
 // ---------------------------------------------------------------------------
 
+/** The direction of a single daily_entries row — what the money did. */
 export type EntryDirection = 'income' | 'expense';
 export type EntryScope     = 'business' | 'personal';
 export type TxnType        = 'entry' | 'cash_count' | 'transfer';
+
+/** Category direction: 'income' / 'expense' for direction-locked categories,
+ *  'shared' for funds that flow in AND out (e.g. Chit Fund collection). */
+export type CategoryDirection = 'income' | 'expense' | 'shared';
 
 export interface PaymentMode {
   id: string;
@@ -404,9 +409,13 @@ export interface Category {
   id: string;
   name: string;
   slug: string;
-  direction: EntryDirection;
+  /** 'income' / 'expense' / 'shared' (migration 021). Shared categories can
+   *  be used on both income and expense entries; their running balance is
+   *  shown on the Dashboard Funds panel. */
+  direction: CategoryDirection;
   scope: EntryScope;
-  /** TRUE for refund-style categories (money flowing back in via an expense entry). */
+  /** TRUE for refund-style categories (money flowing back in via an expense entry).
+   *  Only meaningful for direction='expense'. */
   is_credit_note: boolean;
   sort_order: number;
   is_active: boolean;
@@ -494,6 +503,22 @@ export interface DailyBookAccountBalance {
   lifetime_net: number;
   is_active: boolean;
   sort_order: number;
+}
+
+// Migration 021 — running balance per shared (fund) category
+export interface FundBalance {
+  category_id: string;
+  category_name: string;
+  category_slug: string;
+  scope: EntryScope;
+  sort_order: number;
+  is_active: boolean;
+  notes: string | null;
+  total_in: number;
+  total_out: number;
+  current_balance: number;
+  entry_count: number;
+  last_activity_date: string | null;
 }
 
 export interface DailyBookSummaryRow {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   supabase,
   Category,
-  EntryDirection,
+  CategoryDirection,
   EntryScope,
 } from '@/lib/supabase';
 import {
@@ -13,16 +13,18 @@ import {
 } from 'lucide-react';
 import useEscapeKey from '@/lib/useEscapeKey';
 
-const TABS: { key: string; label: string; direction: EntryDirection; scope: EntryScope; accent: string }[] = [
+const TABS: { key: string; label: string; direction: CategoryDirection; scope: EntryScope; accent: string; hint?: string }[] = [
   { key: 'biz_in',   label: 'Business Income',  direction: 'income',  scope: 'business', accent: 'border-emerald-500 text-emerald-700' },
   { key: 'biz_out',  label: 'Business Expense', direction: 'expense', scope: 'business', accent: 'border-rose-500 text-rose-700'       },
   { key: 'pers_in',  label: 'Personal Income',  direction: 'income',  scope: 'personal', accent: 'border-emerald-500 text-emerald-700' },
   { key: 'pers_out', label: 'Personal Expense', direction: 'expense', scope: 'personal', accent: 'border-rose-500 text-rose-700'       },
+  { key: 'biz_fund', label: '📌 Business Funds', direction: 'shared', scope: 'business', accent: 'border-violet-500 text-violet-700', hint: 'Shared categories — used for both income & expense (e.g. fund pools)' },
+  { key: 'pers_fund',label: '📌 Personal Funds',direction: 'shared', scope: 'personal', accent: 'border-violet-500 text-violet-700', hint: 'Shared categories — used for both income & expense (e.g. Chit Fund)' },
 ];
 
 interface ModalState {
   open: boolean;
-  direction: EntryDirection;
+  direction: CategoryDirection;
   scope: EntryScope;
   existing: Category | null;
 }
@@ -64,7 +66,12 @@ export default function CategoriesAdminPage() {
     const m: Record<string, number> = {};
     for (const t of TABS) m[t.key] = 0;
     for (const c of categories) {
-      const key = `${c.scope === 'business' ? 'biz' : 'pers'}_${c.direction === 'income' ? 'in' : 'out'}`;
+      const scopePrefix = c.scope === 'business' ? 'biz' : 'pers';
+      let suffix: string;
+      if (c.direction === 'income') suffix = 'in';
+      else if (c.direction === 'expense') suffix = 'out';
+      else suffix = 'fund';
+      const key = `${scopePrefix}_${suffix}`;
       m[key] = (m[key] ?? 0) + 1;
     }
     return m;
@@ -131,6 +138,16 @@ export default function CategoriesAdminPage() {
           ))}
         </div>
 
+        {/* Hint banner for fund tabs */}
+        {tab.direction === 'shared' && (
+          <div className="bg-violet-50 border border-violet-200 rounded-lg p-3 text-xs text-violet-900">
+            📌 <strong>Shared categories</strong> can be tagged on BOTH income AND expense entries.
+            Example: create &quot;Chit Fund A 2026&quot; here, then use it on the ₹50K receipt AND on
+            each ₹10K withdrawal. The running balance is shown on the Daily Book dashboard&apos;s
+            Fund Balances panel.
+          </div>
+        )}
+
         {/* Add button */}
         <div className="flex items-center justify-between">
           <div>
@@ -139,9 +156,11 @@ export default function CategoriesAdminPage() {
           </div>
           <button
             onClick={() => openModal()}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-lg shadow-sm"
+            className={`inline-flex items-center gap-1.5 px-4 py-2 text-white text-sm font-semibold rounded-lg shadow-sm ${
+              tab.direction === 'shared' ? 'bg-violet-600 hover:bg-violet-700' : 'bg-amber-600 hover:bg-amber-700'
+            }`}
           >
-            <Plus className="w-4 h-4" /> Add Category
+            <Plus className="w-4 h-4" /> Add {tab.direction === 'shared' ? 'Fund' : 'Category'}
           </button>
         </div>
 
@@ -288,14 +307,18 @@ function CategoryModal({
   };
 
   const scopeLabel = state.scope === 'business' ? 'Business' : 'Personal';
-  const dirLabel   = state.direction === 'income' ? 'Income' : 'Expense';
+  const dirLabel   = state.direction === 'income'  ? 'Income'
+                   : state.direction === 'expense' ? 'Expense'
+                   : 'Shared (Fund)';
+  const isShared   = state.direction === 'shared';
+  const entityLabel = isShared ? 'Fund' : 'Category';
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
       <div className="bg-white w-full sm:max-w-md sm:rounded-2xl shadow-2xl">
         <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">{isEdit ? 'Edit Category' : 'Add Category'}</h2>
+            <h2 className="text-lg font-semibold text-gray-900">{isEdit ? `Edit ${entityLabel}` : `Add ${entityLabel}`}</h2>
             <div className="text-xs text-gray-500">{scopeLabel} · {dirLabel}</div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700">
@@ -367,6 +390,14 @@ function CategoryModal({
                 </div>
               </div>
             </label>
+          )}
+
+          {isShared && (
+            <div className="rounded-lg border border-violet-200 bg-violet-50 p-3 text-xs text-violet-900">
+              📌 This is a <strong>shared category (fund)</strong>. It will appear in both
+              {scopeLabel.toLowerCase()} Income AND Expense dropdowns when adding an entry, and
+              its running balance (received − spent) will show on the Daily Book dashboard.
+            </div>
           )}
 
           {error && (

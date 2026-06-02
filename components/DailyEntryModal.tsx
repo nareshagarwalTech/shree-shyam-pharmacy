@@ -134,11 +134,15 @@ export default function DailyEntryModal({
     }
   }, [selectedType, cashAccount, isEdit]);
 
-  // Filtered category list by direction + scope
+  // Filtered category list by scope; direction matches the entry's direction
+  // OR is 'shared' (= fund / earmarked pool, can be tagged on both income & expense).
   const visibleCategories = useMemo(() => {
     if (selectedType.txnType !== 'entry') return [];
     return categories.filter(
-      (c) => c.direction === selectedType.direction && c.scope === selectedType.scope && c.is_active
+      (c) =>
+        c.scope === selectedType.scope &&
+        c.is_active &&
+        (c.direction === selectedType.direction || c.direction === 'shared')
     );
   }, [categories, selectedType]);
 
@@ -353,16 +357,30 @@ export default function DailyEntryModal({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                  Category
+                  <span className="text-xs text-gray-400 font-normal ml-2">📌 shared = fund / earmarked pool</span>
+                </label>
                 <select
                   value={categoryId}
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 >
                   <option value="">{visibleCategories.length === 0 ? 'No categories — add one in /manager/daily-book/categories' : 'Select…'}</option>
-                  {visibleCategories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.is_credit_note ? '  (refund)' : ''}</option>
+                  {/* Regular direction-matching categories */}
+                  {visibleCategories.filter((c) => c.direction !== 'shared').map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}{c.is_credit_note ? '  (refund)' : ''}
+                    </option>
                   ))}
+                  {/* Shared funds — clearly tagged */}
+                  {visibleCategories.some((c) => c.direction === 'shared') && (
+                    <optgroup label="📌 Funds (shared)">
+                      {visibleCategories.filter((c) => c.direction === 'shared').map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
                 </select>
               </div>
             </>
