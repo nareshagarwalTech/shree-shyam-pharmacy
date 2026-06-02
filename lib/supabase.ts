@@ -51,7 +51,10 @@ export interface Customer {
   updated_at: string;
 }
 
-export type PaymentMode = 'cash' | 'online' | 'credit' | null;
+/** Legacy: per-customer payment mode on `sales_transactions.payment_mode`
+ *  (migration 003). Not to be confused with the Daily Book `PaymentMode`
+ *  interface (migration 019). */
+export type LegacyPaymentMode = 'cash' | 'online' | 'credit' | null;
 
 // Migration 005 — payments table is the source of truth for received money
 export type PaymentChannel = 'cash' | 'online' | 'cheque' | 'card' | 'other';
@@ -96,7 +99,7 @@ export interface SalesTransaction {
   customer_paid: number | null;
   change_given: number | null;
   balance_left: number | null;
-  payment_mode: PaymentMode;
+  payment_mode: LegacyPaymentMode;
   payment_date: string | null;
   delivery_notes: string | null;
 }
@@ -377,55 +380,67 @@ export interface Account {
   updated_at: string;
 }
 
-export interface ExpenseCategory {
-  id: string;
-  name: string;
-  slug: string;
-  sort_order: number;
-  is_credit_note: boolean;
-  is_active: boolean;
-  created_at: string;
-}
+// ---------------------------------------------------------------------------
+// Daily Book v2 — migration 019 (redesign: Direction × Scope model)
+// ---------------------------------------------------------------------------
 
-export interface SaleChannel {
+export type EntryDirection = 'income' | 'expense';
+export type EntryScope     = 'business' | 'personal';
+export type TxnType        = 'entry' | 'cash_count' | 'transfer';
+
+export interface PaymentMode {
   id: string;
   name: string;
   slug: string;
-  default_account_id: string | null;
   has_commission: boolean;
   sort_order: number;
   is_active: boolean;
+  notes: string | null;
   created_at: string;
+  updated_at: string;
 }
 
-export type DailyEntryType =
-  | 'sale'
-  | 'expense'
-  | 'cash_count'
-  | 'bank_transfer'
-  | 'cash_deposit';
+export interface Category {
+  id: string;
+  name: string;
+  slug: string;
+  direction: EntryDirection;
+  scope: EntryScope;
+  /** TRUE for refund-style categories (money flowing back in via an expense entry). */
+  is_credit_note: boolean;
+  sort_order: number;
+  is_active: boolean;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export interface DailyEntry {
   id: string;
-  /** Transaction date — when the sale/expense actually happened. */
-  entry_date: string;                    // ISO date YYYY-MM-DD
-  /** When the bank credited the money (migration 018). Only meaningful for
-   *  POS/QR sales with delayed settlement. Defaults to entry_date in views
-   *  when NULL. */
+  /** Transaction date — when it actually happened. */
+  entry_date: string;                    // ISO YYYY-MM-DD
+  /** When bank actually credited the money. Optional, used for income with
+   *  delayed settlement (POS/QR). Defaults to entry_date in views. */
   settlement_date: string | null;
-  entry_type: DailyEntryType;
-  narration: string | null;
-  txn_amount: number;
-  settled_amount: number | null;
+  txn_type: TxnType;
+  /** Required when txn_type='entry'. NULL for cash_count / transfer. */
+  direction: EntryDirection | null;
+  scope: EntryScope | null;
   account_id: string | null;
+  /** Only used for txn_type='transfer' (destination account). */
   transfer_to_account_id: string | null;
-  expense_category_id: string | null;
-  sale_channel_id: string | null;
-  /** If set, this entry is an auto-created BANK CHARGES expense linked to a
-   *  SALE row (migration 018). The trigger keeps it in sync — do NOT edit
-   *  the row directly; edit the source sale instead. */
-  linked_sale_id: string | null;
+  /** Required when txn_type='entry'. */
+  mode_id: string | null;
+  /** Required when txn_type='entry'. Must match direction+scope. */
+  category_id: string | null;
+  txn_amount: number;
+  /** Gross-minus-commission, for INCOME with commission mode. */
+  settled_amount: number | null;
+  narration: string | null;
   notes: string | null;
+  /** Set on auto-created BANK CHARGES expense rows; points back to source income. */
+  linked_entry_id: string | null;
+  linked_role: 'auto_bank_charges' | null;
   created_at: string;
   updated_at: string;
   created_by: string;
@@ -433,7 +448,7 @@ export interface DailyEntry {
 
 export interface CashDenomination {
   id: string;
-  count_date: string;                    // ISO date
+  count_date: string;
   denomination: 500 | 200 | 100 | 50 | 20 | 10 | 5 | 2 | 1;
   count: number;
   daily_entry_id: string | null;
@@ -444,46 +459,14 @@ export interface CashDenomination {
 export interface AccountOpeningBalance {
   id: string;
   account_id: string;
-  effective_date: string;                // ISO date — balance "as of start of this day"
+  effective_date: string;
   amount: number;
   notes: string | null;
   created_at: string;
   updated_at: string;
 }
 
-// Views (computed)
-
-export interface DailyBookSalesSummary {
-  entry_date: string;
-  pos_txn: number;
-  pos_settled: number;
-  pos_commission: number;
-  qr_txn: number;
-  qr_settled: number;
-  qr_commission: number;
-  online_amt: number;
-  credit_amt: number;
-  cash_sales: number;
-  total_sales: number;
-  entry_count: number;
-}
-
-export interface DailyBookExpenseSummary {
-  entry_date: string;
-  purchase: number;
-  salary: number;
-  rent: number;
-  electricity: number;
-  transport: number;
-  diesel: number;
-  home_expenses: number;
-  bank_charges: number;
-  other: number;
-  clearing: number;
-  total_expense: number;
-  cr_note: number;
-  net_expense: number;
-}
+// --- Views ---
 
 export interface DailyBookBankLedgerRow {
   account_id: string;
@@ -504,45 +487,25 @@ export interface DailyBookAccountBalance {
   account_short_name: string | null;
   account_kind: AccountKind;
   opening_balance: number;
-  /** Most recent monthly opening balance amount, if any (migration 017). */
   monthly_opening_amount: number | null;
-  /** Effective date of the most recent monthly opening (migration 017). */
   monthly_opening_date: string | null;
-  /** Sum of movements since the baseline date (monthly opening or inception). */
   movements_since_baseline: number;
-  /** Computed current balance using the baseline. */
   current_balance: number;
-  /** Total lifetime movement (all entries, ignoring monthly openings). Kept for compatibility. */
   lifetime_net: number;
   is_active: boolean;
   sort_order: number;
 }
 
-export interface DailyBookClosingBalance {
+export interface DailyBookSummaryRow {
   entry_date: string;
-  opening_cash: number;
-  cash_sales: number;
-  cash_expenses: number;
-  cash_cr_note: number;
-  cash_deposits_out: number;
-  actual_cash: number | null;
-  expected_cash: number;
-  cash_diff: number | null;
-}
-
-export interface DailyBookPaymentReconciliation {
-  entry_date: string;
-  daily_book_cash: number;
-  payments_cash: number;
-  cash_diff: number;
-  daily_book_online: number;
-  payments_online: number;
-  online_diff: number;
-  daily_book_pos_qr: number;
-  payments_pos_qr: number;
-  pos_qr_diff: number;
-  daily_book_total: number;
-  payments_total: number;
-  total_diff: number;
+  direction: EntryDirection;
+  scope: EntryScope;
+  category_id: string;
+  category_name: string;
+  category_slug: string;
+  mode_id: string;
+  mode_name: string;
+  total: number;
+  entry_count: number;
 }
 

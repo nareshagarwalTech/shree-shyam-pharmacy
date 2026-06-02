@@ -5,10 +5,12 @@ import { X, Save, Trash2 } from 'lucide-react';
 import {
   supabase,
   Account,
-  ExpenseCategory,
-  SaleChannel,
+  Category,
+  PaymentMode,
   DailyEntry,
-  DailyEntryType,
+  EntryDirection,
+  EntryScope,
+  TxnType,
 } from '@/lib/supabase';
 import useEscapeKey from '@/lib/useEscapeKey';
 
@@ -19,158 +21,183 @@ interface Props {
   /** If set, edit mode; otherwise create. */
   entry?: DailyEntry | null;
   accounts: Account[];
-  categories: ExpenseCategory[];
-  channels: SaleChannel[];
+  categories: Category[];
+  modes: PaymentMode[];
   /** Default date for new entries (YYYY-MM-DD). */
   defaultDate: string;
 }
 
-const ENTRY_TYPES: { value: DailyEntryType; label: string; emoji: string; desc: string }[] = [
-  { value: 'sale',          label: 'Sale',          emoji: '🟢', desc: 'Money in — POS, QR, Online, Credit, Cash sale' },
-  { value: 'expense',       label: 'Expense',       emoji: '🔴', desc: 'Money out — purchases, bills, salary, etc.' },
-  { value: 'cash_count',    label: 'Cash Count',    emoji: '💵', desc: 'Physical cash on hand at close of day' },
-  { value: 'bank_transfer', label: 'Bank Transfer', emoji: '🏦', desc: 'Move money between two accounts' },
-  { value: 'cash_deposit',  label: 'Cash Deposit',  emoji: '🏧', desc: 'Deposit cash into a bank account' },
+// The 6 type tiles. Encodes direction + scope + txn_type.
+interface TypeOption {
+  key: string;
+  label: string;
+  emoji: string;
+  description: string;
+  accent: string;          // tailwind classes for selected state
+  txnType: TxnType;
+  direction: EntryDirection | null;
+  scope: EntryScope | null;
+}
+const TYPE_OPTIONS: TypeOption[] = [
+  { key: 'biz_income',  label: 'Business Income',  emoji: '🟢', description: 'Sales — POS, QR, online, cash',
+    accent: 'border-emerald-500 bg-emerald-50 ring-emerald-100',
+    txnType: 'entry', direction: 'income', scope: 'business' },
+  { key: 'biz_expense', label: 'Business Expense', emoji: '🔴', description: 'Purchase, salary, rent, bills',
+    accent: 'border-rose-500 bg-rose-50 ring-rose-100',
+    txnType: 'entry', direction: 'expense', scope: 'business' },
+  { key: 'pers_income', label: 'Personal Income',  emoji: '🟢', description: 'Salary, gift, dividend, refund',
+    accent: 'border-emerald-500 bg-emerald-50 ring-emerald-100',
+    txnType: 'entry', direction: 'income', scope: 'personal' },
+  { key: 'pers_expense',label: 'Personal Expense', emoji: '🔴', description: 'Groceries, fuel, household',
+    accent: 'border-rose-500 bg-rose-50 ring-rose-100',
+    txnType: 'entry', direction: 'expense', scope: 'personal' },
+  { key: 'cash_count',  label: 'Cash Count',       emoji: '💵', description: 'Physical cash on hand at close',
+    accent: 'border-amber-500 bg-amber-50 ring-amber-100',
+    txnType: 'cash_count', direction: null, scope: null },
+  { key: 'transfer',    label: 'Account Transfer', emoji: '🔁', description: 'Move money between your accounts',
+    accent: 'border-violet-500 bg-violet-50 ring-violet-100',
+    txnType: 'transfer', direction: null, scope: null },
 ];
 
+function keyForEntry(e: DailyEntry): string {
+  if (e.txn_type === 'cash_count') return 'cash_count';
+  if (e.txn_type === 'transfer')   return 'transfer';
+  // txn_type === 'entry'
+  if (e.direction === 'income'  && e.scope === 'business') return 'biz_income';
+  if (e.direction === 'expense' && e.scope === 'business') return 'biz_expense';
+  if (e.direction === 'income'  && e.scope === 'personal') return 'pers_income';
+  if (e.direction === 'expense' && e.scope === 'personal') return 'pers_expense';
+  return 'biz_income';
+}
+
 export default function DailyEntryModal({
-  open,
-  onClose,
-  onSaved,
-  entry,
-  accounts,
-  categories,
-  channels,
-  defaultDate,
+  open, onClose, onSaved, entry, accounts, categories, modes, defaultDate,
 }: Props) {
   useEscapeKey(onClose, open);
 
   const isEdit = !!entry;
+  const isLinked = !!entry?.linked_entry_id;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Form state
-  const [entryDate, setEntryDate] = useState(defaultDate);
+  const [typeKey, setTypeKey]         = useState<string>('biz_income');
+  const [entryDate, setEntryDate]     = useState(defaultDate);
   const [settlementDate, setSettlementDate] = useState('');
-  const [entryType, setEntryType] = useState<DailyEntryType>('sale');
-  const [narration, setNarration] = useState('');
-  const [txnAmount, setTxnAmount] = useState('');
+  const [accountId, setAccountId]     = useState('');
+  const [transferToId, setTransferToId] = useState('');
+  const [modeId, setModeId]           = useState('');
+  const [categoryId, setCategoryId]   = useState('');
+  const [txnAmount, setTxnAmount]     = useState('');
   const [settledAmount, setSettledAmount] = useState('');
-  const [accountId, setAccountId] = useState<string>('');
-  const [transferToId, setTransferToId] = useState<string>('');
-  const [categoryId, setCategoryId] = useState<string>('');
-  const [channelId, setChannelId] = useState<string>('');
-  const [notes, setNotes] = useState('');
+  const [narration, setNarration]     = useState('');
+  const [notes, setNotes]             = useState('');
 
-  // Pre-fill on edit (re-runs when entry changes)
+  // Prefill from entry on open
   useEffect(() => {
     if (!open) return;
     if (entry) {
+      setTypeKey(keyForEntry(entry));
       setEntryDate(entry.entry_date);
       setSettlementDate(entry.settlement_date ?? '');
-      setEntryType(entry.entry_type);
-      setNarration(entry.narration ?? '');
-      setTxnAmount(String(entry.txn_amount ?? ''));
-      setSettledAmount(entry.settled_amount != null ? String(entry.settled_amount) : '');
       setAccountId(entry.account_id ?? '');
       setTransferToId(entry.transfer_to_account_id ?? '');
-      setCategoryId(entry.expense_category_id ?? '');
-      setChannelId(entry.sale_channel_id ?? '');
+      setModeId(entry.mode_id ?? '');
+      setCategoryId(entry.category_id ?? '');
+      setTxnAmount(String(entry.txn_amount ?? ''));
+      setSettledAmount(entry.settled_amount != null ? String(entry.settled_amount) : '');
+      setNarration(entry.narration ?? '');
       setNotes(entry.notes ?? '');
     } else {
+      setTypeKey('biz_income');
       setEntryDate(defaultDate);
       setSettlementDate('');
-      setEntryType('sale');
-      setNarration('');
-      setTxnAmount('');
-      setSettledAmount('');
       setAccountId('');
       setTransferToId('');
+      setModeId('');
       setCategoryId('');
-      setChannelId('');
+      setTxnAmount('');
+      setSettledAmount('');
+      setNarration('');
       setNotes('');
     }
     setError(null);
   }, [open, entry, defaultDate]);
 
-  // Convenience lookups
-  const cashAccountId = useMemo(() => accounts.find((a) => a.kind === 'cash')?.id ?? '', [accounts]);
-  const bankAccounts = useMemo(() => accounts.filter((a) => a.kind === 'bank'), [accounts]);
-  const selectedChannel = useMemo(() => channels.find((c) => c.id === channelId), [channels, channelId]);
+  const selectedType = useMemo(() => TYPE_OPTIONS.find((t) => t.key === typeKey)!, [typeKey]);
+  const cashAccount  = useMemo(() => accounts.find((a) => a.kind === 'cash'), [accounts]);
+  const selectedMode = useMemo(() => modes.find((m) => m.id === modeId) ?? null, [modes, modeId]);
 
-  // When channel changes for SALE, auto-default account from channel
+  // For non-entry types, no category/mode. For cash_count, force CASH account.
   useEffect(() => {
-    if (entryType !== 'sale' || !selectedChannel || isEdit) return;
-    if (selectedChannel.default_account_id && !accountId) {
-      setAccountId(selectedChannel.default_account_id);
+    if (selectedType.txnType === 'cash_count' && cashAccount && !isEdit) {
+      setAccountId(cashAccount.id);
     }
-  }, [entryType, selectedChannel, accountId, isEdit]);
+  }, [selectedType, cashAccount, isEdit]);
 
-  // For CASH COUNT, force account to CASH
-  useEffect(() => {
-    if (entryType === 'cash_count' && cashAccountId) setAccountId(cashAccountId);
-  }, [entryType, cashAccountId]);
+  // Filtered category list by direction + scope
+  const visibleCategories = useMemo(() => {
+    if (selectedType.txnType !== 'entry') return [];
+    return categories.filter(
+      (c) => c.direction === selectedType.direction && c.scope === selectedType.scope && c.is_active
+    );
+  }, [categories, selectedType]);
 
-  // For CASH DEPOSIT, force source to CASH
+  // If the user switches type, clear category (since the list changes)
   useEffect(() => {
-    if (entryType === 'cash_deposit' && cashAccountId) setAccountId(cashAccountId);
-  }, [entryType, cashAccountId]);
+    if (!isEdit) setCategoryId('');
+  }, [selectedType.key, isEdit]);
 
   if (!open) return null;
 
+  // -------- save -------- //
   const handleSave = async () => {
     setError(null);
-    const amt = parseFloat(txnAmount);
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setError('Amount must be greater than zero.');
+    if (isLinked) {
+      setError('This row is auto-managed by a parent income entry. Edit the source instead.');
       return;
     }
+    const amt = parseFloat(txnAmount);
+    if (!Number.isFinite(amt) || amt <= 0) { setError('Amount must be greater than zero.'); return; }
 
     const payload: Partial<DailyEntry> = {
       entry_date: entryDate,
       settlement_date: null,
-      entry_type: entryType,
-      narration: narration.trim() || null,
-      txn_amount: amt,
-      settled_amount: null,
+      txn_type: selectedType.txnType,
+      direction: selectedType.direction,
+      scope: selectedType.scope,
       account_id: null,
       transfer_to_account_id: null,
-      expense_category_id: null,
-      sale_channel_id: null,
+      mode_id: null,
+      category_id: null,
+      txn_amount: amt,
+      settled_amount: null,
+      narration: narration.trim() || null,
       notes: notes.trim() || null,
     };
 
-    if (entryType === 'sale') {
-      if (!channelId) { setError('Pick a sale channel.'); return; }
-      payload.sale_channel_id = channelId;
-      // Account is required unless channel is CREDIT (no account flows)
-      if (selectedChannel?.slug !== 'credit') {
-        if (!accountId) { setError('Pick the account money settled into.'); return; }
-        payload.account_id = accountId;
-      }
-      if (selectedChannel?.has_commission && settledAmount) {
+    if (selectedType.txnType === 'entry') {
+      if (!accountId)  { setError('Pick an account.'); return; }
+      if (!modeId)     { setError('Pick a payment mode.'); return; }
+      if (!categoryId) { setError('Pick a category.'); return; }
+      payload.account_id = accountId;
+      payload.mode_id = modeId;
+      payload.category_id = categoryId;
+
+      // Commission only applies to INCOME with has_commission mode
+      if (selectedType.direction === 'income' && selectedMode?.has_commission && settledAmount) {
         const s = parseFloat(settledAmount);
         if (!Number.isFinite(s) || s < 0) { setError('Settled amount looks wrong.'); return; }
-        if (s > amt) { setError('Settled amount cannot exceed transaction amount.'); return; }
+        if (s > amt) { setError('Settled cannot exceed transaction amount.'); return; }
         payload.settled_amount = s;
-        // Settlement date only applies when there's a commission to track
         if (settlementDate) payload.settlement_date = settlementDate;
       }
-    } else if (entryType === 'expense') {
-      if (!categoryId)    { setError('Pick an expense category.'); return; }
-      if (!accountId)     { setError('Pick the account money came from.'); return; }
-      payload.expense_category_id = categoryId;
-      payload.account_id = accountId;
-    } else if (entryType === 'cash_count') {
-      payload.account_id = cashAccountId;
-    } else if (entryType === 'bank_transfer') {
+    } else if (selectedType.txnType === 'cash_count') {
+      if (!cashAccount) { setError('CASH account is not configured.'); return; }
+      payload.account_id = cashAccount.id;
+    } else if (selectedType.txnType === 'transfer') {
       if (!accountId || !transferToId) { setError('Pick source and destination accounts.'); return; }
       if (accountId === transferToId)  { setError('Source and destination must differ.'); return; }
       payload.account_id = accountId;
-      payload.transfer_to_account_id = transferToId;
-    } else if (entryType === 'cash_deposit') {
-      if (!transferToId) { setError('Pick the bank account to deposit into.'); return; }
-      payload.account_id = cashAccountId;
       payload.transfer_to_account_id = transferToId;
     }
 
@@ -186,7 +213,11 @@ export default function DailyEntryModal({
 
   const handleDelete = async () => {
     if (!entry) return;
-    if (!confirm(`Delete this ${entry.entry_type.replace('_', ' ')} entry?`)) return;
+    if (isLinked) {
+      setError('Auto-managed. Delete the source income entry instead.');
+      return;
+    }
+    if (!confirm('Delete this entry?')) return;
     setSaving(true);
     const { error: dbErr } = await supabase.from('daily_entries').delete().eq('id', entry.id);
     setSaving(false);
@@ -194,11 +225,11 @@ export default function DailyEntryModal({
     onSaved();
   };
 
-  // ---- render helpers ----
-  const accountOptions = (filter: (a: Account) => boolean = () => true) =>
-    accounts.filter(filter).map((a) => (
-      <option key={a.id} value={a.id}>{a.name}</option>
-    ));
+  // -------- render -------- //
+  const showCommissionUI =
+    selectedType.txnType === 'entry' &&
+    selectedType.direction === 'income' &&
+    !!selectedMode?.has_commission;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/40 backdrop-blur-sm">
@@ -206,14 +237,42 @@ export default function DailyEntryModal({
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-gray-900">
-            {isEdit ? 'Edit Entry' : 'New Daily Entry'}
+            {isEdit ? (isLinked ? 'View Auto-Linked Entry' : 'Edit Entry') : 'New Daily Entry'}
           </h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        {isLinked && (
+          <div className="mx-6 mt-4 p-3 bg-violet-50 border border-violet-200 rounded-lg text-sm text-violet-800">
+            🔒 This entry is auto-managed by a source income transaction. Edit the source to change.
+          </div>
+        )}
+
+        <div className={`px-6 py-5 space-y-5 ${isLinked ? 'opacity-70 pointer-events-none' : ''}`}>
+          {/* Type tiles */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Entry Type</label>
+            <div className="grid grid-cols-2 gap-2">
+              {TYPE_OPTIONS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setTypeKey(t.key)}
+                  disabled={isEdit}
+                  className={`text-left p-2.5 rounded-lg border transition ${
+                    typeKey === t.key ? `${t.accent} ring-2` : 'border-gray-200 hover:border-gray-300 bg-white'
+                  } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
+                >
+                  <div className="font-medium text-gray-900 text-sm">{t.emoji} {t.label}</div>
+                  <div className="text-[11px] text-gray-500 mt-0.5 leading-snug">{t.description}</div>
+                </button>
+              ))}
+            </div>
+            {isEdit && <div className="text-xs text-gray-400 mt-1">Type cannot be changed after creation.</div>}
+          </div>
+
           {/* Transaction Date */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -228,66 +287,71 @@ export default function DailyEntryModal({
             />
           </div>
 
-          {/* Entry Type */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Entry Type</label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {ENTRY_TYPES.map((t) => (
-                <button
-                  key={t.value}
-                  type="button"
-                  onClick={() => setEntryType(t.value)}
-                  disabled={isEdit}
-                  className={`text-left p-2.5 rounded-lg border transition ${
-                    entryType === t.value
-                      ? 'border-indigo-500 bg-indigo-50 ring-2 ring-indigo-100'
-                      : 'border-gray-200 hover:border-gray-300'
-                  } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
-                >
-                  <div className="font-medium text-gray-900 text-sm">
-                    {t.emoji} {t.label}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5 leading-snug">{t.desc}</div>
-                </button>
-              ))}
-            </div>
-            {isEdit && <div className="text-xs text-gray-400 mt-1">Type cannot be changed after creation.</div>}
-          </div>
-
-          {/* Type-specific fields */}
-          {entryType === 'sale' && (
-            <>
+          {/* Account (and Transfer-to for transfer type) */}
+          {selectedType.txnType === 'transfer' ? (
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Sale Channel</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">From Account</label>
                 <select
-                  value={channelId}
-                  onChange={(e) => setChannelId(e.target.value)}
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 >
                   <option value="">Select…</option>
-                  {channels.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
+                  {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">To Account</label>
+                <select
+                  value={transferToId}
+                  onChange={(e) => setTransferToId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                >
+                  <option value="">Select…</option>
+                  {accounts.filter((a) => a.id !== accountId).map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
               </div>
-              {selectedChannel?.slug !== 'credit' && (
+            </div>
+          ) : selectedType.txnType === 'cash_count' ? (
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+              💡 Use the <a href="/manager/daily-book/denomination" className="underline font-medium">denomination calculator</a> for a precise count. This entry sits against the CASH account automatically.
+            </div>
+          ) : (
+            // 'entry' type — Account + Mode + Category
+            <>
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">Settled Into Account</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Account <span className="text-xs text-gray-400 font-normal">where money is</span>
+                  </label>
                   <select
                     value={accountId}
                     onChange={(e) => setAccountId(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                   >
                     <option value="">Select…</option>
-                    {accountOptions()}
+                    {accounts.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
                   </select>
                 </div>
-              )}
-            </>
-          )}
-
-          {entryType === 'expense' && (
-            <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Mode <span className="text-xs text-gray-400 font-normal">how it moved</span>
+                  </label>
+                  <select
+                    value={modeId}
+                    onChange={(e) => setModeId(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                  >
+                    <option value="">Select…</option>
+                    {modes.filter((m) => m.is_active).map((m) => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Category</label>
                 <select
@@ -295,76 +359,13 @@ export default function DailyEntryModal({
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
                 >
-                  <option value="">Select…</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}{c.is_credit_note ? '  (refund in)' : ''}</option>
+                  <option value="">{visibleCategories.length === 0 ? 'No categories — add one in /manager/daily-book/categories' : 'Select…'}</option>
+                  {visibleCategories.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}{c.is_credit_note ? '  (refund)' : ''}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">Paid From / Refund Into</label>
-                <select
-                  value={accountId}
-                  onChange={(e) => setAccountId(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                >
-                  <option value="">Select…</option>
-                  {accountOptions()}
-                </select>
-              </div>
             </>
-          )}
-
-          {entryType === 'bank_transfer' && (
-            <>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">From</label>
-                  <select
-                    value={accountId}
-                    onChange={(e) => setAccountId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select…</option>
-                    {accountOptions()}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">To</label>
-                  <select
-                    value={transferToId}
-                    onChange={(e) => setTransferToId(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-                  >
-                    <option value="">Select…</option>
-                    {accountOptions((a) => a.id !== accountId)}
-                  </select>
-                </div>
-              </div>
-            </>
-          )}
-
-          {entryType === 'cash_deposit' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Deposit Into Bank</label>
-              <select
-                value={transferToId}
-                onChange={(e) => setTransferToId(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
-              >
-                <option value="">Select bank…</option>
-                {bankAccounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-              <div className="text-xs text-gray-400 mt-1">Source: CASH (auto)</div>
-            </div>
-          )}
-
-          {entryType === 'cash_count' && (
-            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-              💡 Tip: use the <a href="/manager/daily-book/denomination" className="underline font-medium">denomination calculator</a> for a precise count.
-            </div>
           )}
 
           {/* Narration */}
@@ -376,22 +377,16 @@ export default function DailyEntryModal({
               type="text"
               value={narration}
               onChange={(e) => setNarration(e.target.value)}
-              placeholder={
-                entryType === 'sale' ? 'e.g. POS (14/05/2026)' :
-                entryType === 'expense' ? 'e.g. SAI PHARMA' :
-                entryType === 'cash_count' ? 'CLOSING BALANCE' :
-                entryType === 'bank_transfer' ? 'e.g. NEFT to HDFC' :
-                'e.g. Deposited at HDFC branch'
-              }
+              placeholder="e.g. SAI PHARMA / Hospital eye / GPay Piyush"
               className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
             />
           </div>
 
           {/* Amounts */}
-          <div className={selectedChannel?.has_commission && entryType === 'sale' ? 'grid grid-cols-2 gap-3' : ''}>
+          <div className={showCommissionUI ? 'grid grid-cols-2 gap-3' : ''}>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                {entryType === 'sale' && selectedChannel?.has_commission ? 'Txn Amount (gross)' : 'Amount'} (₹)
+                {showCommissionUI ? 'Txn Amount (gross)' : 'Amount'} (₹)
               </label>
               <input
                 type="number"
@@ -402,7 +397,7 @@ export default function DailyEntryModal({
                 className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 text-lg font-medium"
               />
             </div>
-            {entryType === 'sale' && selectedChannel?.has_commission && (
+            {showCommissionUI && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Settled (₹) <span className="text-gray-400 font-normal">optional</span>
@@ -419,13 +414,13 @@ export default function DailyEntryModal({
             )}
           </div>
 
-          {/* Settlement Date + bank charges preview — SALE with commission only */}
-          {entryType === 'sale' && selectedChannel?.has_commission && settledAmount && parseFloat(settledAmount) < parseFloat(txnAmount || '0') && (
+          {/* Settlement Date + bank charges preview — only when commission detected */}
+          {showCommissionUI && settledAmount && parseFloat(settledAmount) < parseFloat(txnAmount || '0') && (
             <div className="rounded-lg border border-indigo-200 bg-indigo-50/50 p-3 space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">
                   Settlement Date
-                  <span className="text-xs text-gray-400 font-normal ml-2">when bank credited (defaults to transaction date)</span>
+                  <span className="text-xs text-gray-400 font-normal ml-2">when bank credited</span>
                 </label>
                 <input
                   type="date"
@@ -439,13 +434,8 @@ export default function DailyEntryModal({
                 const acct = accounts.find((a) => a.id === accountId);
                 return (
                   <div className="text-xs space-y-1 text-gray-700 bg-white rounded px-3 py-2 border border-gray-200">
-                    <div>
-                      📥 <strong>{acct?.name || 'Bank'}</strong> credited <strong>₹{parseFloat(settledAmount).toLocaleString('en-IN')}</strong>
-                      &nbsp;on <strong>{settlementDate || entryDate}</strong>
-                    </div>
-                    <div>
-                      🧾 Auto-creates <strong>BANK CHARGES expense ₹{commission.toLocaleString('en-IN')}</strong> on same date
-                    </div>
+                    <div>📥 <strong>{acct?.name || 'Account'}</strong> credited <strong>₹{parseFloat(settledAmount).toLocaleString('en-IN')}</strong> on <strong>{settlementDate || entryDate}</strong></div>
+                    <div>🧾 Auto-creates <strong>BANK CHARGES expense ₹{commission.toLocaleString('en-IN')}</strong> on same date ({selectedType.scope} scope)</div>
                   </div>
                 );
               })()}
@@ -465,44 +455,36 @@ export default function DailyEntryModal({
             />
           </div>
 
-          {/* Error */}
           {error && (
-            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">
-              {error}
-            </div>
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-sm text-rose-700">{error}</div>
           )}
         </div>
 
         {/* Footer */}
         <div className="sticky bottom-0 bg-white border-t border-gray-200 px-6 py-4 flex items-center justify-between gap-3">
           <div>
-            {isEdit && (
+            {isEdit && !isLinked && (
               <button
                 onClick={handleDelete}
                 disabled={saving}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-sm text-rose-600 hover:bg-rose-50 rounded-lg transition disabled:opacity-50"
               >
-                <Trash2 className="w-4 h-4" />
-                Delete
+                <Trash2 className="w-4 h-4" /> Delete
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition disabled:opacity-50"
-            >
-              Cancel
+            <button onClick={onClose} disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition disabled:opacity-50">
+              {isLinked ? 'Close' : 'Cancel'}
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50"
-            >
-              <Save className="w-4 h-4" />
-              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Entry'}
-            </button>
+            {!isLinked && (
+              <button onClick={handleSave} disabled={saving}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition disabled:opacity-50">
+                <Save className="w-4 h-4" />
+                {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Save Entry'}
+              </button>
+            )}
           </div>
         </div>
       </div>

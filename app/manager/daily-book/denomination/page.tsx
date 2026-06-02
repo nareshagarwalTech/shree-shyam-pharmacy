@@ -74,12 +74,12 @@ export default function DenominationPage() {
 
     setSaving(true);
     try {
-      // 1. Create the CASH COUNT daily_entry
+      // 1. Create the CASH COUNT daily_entry (new schema: txn_type='cash_count')
       const { data: entryData, error: entryErr } = await supabase
         .from('daily_entries')
         .insert({
           entry_date: date,
-          entry_type: 'cash_count',
+          txn_type: 'cash_count',
           narration: 'CLOSING BALANCE',
           txn_amount: grandTotal,
           account_id: cashAccount.id,
