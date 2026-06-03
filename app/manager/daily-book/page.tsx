@@ -465,94 +465,73 @@ export default function DailyBookPage() {
                   : <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Cash Short ₹{fmtINR(Math.abs(diff))}</span>}
               </div>
 
-              {/* The simple 4-line math — Net Income / Net Expense clickable to filter */}
-              <div className="px-5 py-4 space-y-2.5 max-w-md mx-auto">
-                <SimpleLine label="Opening Balance" value={opening} bold />
+              {/* Compact horizontal math row: Opening | Income | Expense | Expected | Closing */}
+              <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-2 sm:divide-x sm:divide-gray-200">
+                <Stat label="Opening" value={opening} />
                 <button
                   onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'income' })}
-                  className="w-full hover:bg-emerald-50 rounded px-1 -mx-1 transition"
-                  title="Click to filter entries: Income only"
+                  className="hover:bg-emerald-50 rounded transition group sm:pl-3"
+                  title="Click to filter entries to Income only"
                 >
-                  <SimpleLine label="Net Income (today) →"  value={netIncome}  signed="+" colored="emerald" />
+                  <Stat label="+ Income" value={netIncome} colored="emerald" arrow />
                 </button>
                 <button
                   onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'expense' })}
-                  className="w-full hover:bg-rose-50 rounded px-1 -mx-1 transition"
-                  title="Click to filter entries: Expenses only"
+                  className="hover:bg-rose-50 rounded transition group sm:pl-3"
+                  title="Click to filter entries to Expenses only"
                 >
-                  <SimpleLine label="Net Expense (today) →" value={netExpense} signed="−" colored="rose" />
+                  <Stat label="− Expense" value={netExpense} colored="rose" arrow />
                 </button>
-                <div className="border-t border-dashed border-gray-300 pt-2.5 flex items-baseline justify-between">
-                  <span className="text-sm text-gray-600 font-medium">Expected Closing</span>
-                  <span className="text-lg font-bold tabular-nums text-gray-900">₹{fmtINR(expected)}</span>
-                </div>
-              </div>
-
-              {/* Closing balance input — prominent */}
-              <div className="px-5 py-4 bg-gray-50 border-t border-gray-200">
-                <div className="max-w-md mx-auto">
-                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-1.5">
-                    Actual Closing Balance · count the drawer
-                  </label>
+                <Stat label="Expected" value={expected} bold extraClass="sm:pl-3" />
+                {/* Actual closing — inline editor */}
+                <div className="sm:pl-3 col-span-2 sm:col-span-1">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">Actual Closing</div>
                   {editingClosing ? (
-                    <div className="flex items-stretch gap-2">
-                      <div className="flex-1 relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-lg font-bold">₹</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={closingDraft}
-                          onChange={(e) => setClosingDraft(e.target.value)}
-                          autoFocus
-                          placeholder="0.00"
-                          className="w-full pl-8 pr-3 py-2.5 border-2 border-emerald-400 rounded-lg text-xl font-bold tabular-nums focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                        />
-                      </div>
-                      <button
-                        onClick={saveClosingBalance}
-                        disabled={savingClosing}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg disabled:opacity-50 inline-flex items-center gap-1.5"
-                      >
-                        <Save className="w-4 h-4" /> Save
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={closingDraft}
+                        onChange={(e) => setClosingDraft(e.target.value)}
+                        autoFocus
+                        placeholder="0"
+                        className="flex-1 min-w-0 px-2 py-1 text-base font-bold tabular-nums border-2 border-emerald-400 rounded focus:border-emerald-600 focus:ring-1 focus:ring-emerald-100"
+                      />
+                      <button onClick={saveClosingBalance} disabled={savingClosing}
+                        className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50" title="Save">
+                        <Save className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        onClick={() => setEditingClosing(false)}
-                        disabled={savingClosing}
-                        className="px-3 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg disabled:opacity-50"
-                      >
-                        <X className="w-4 h-4" />
+                      <button onClick={() => setEditingClosing(false)} disabled={savingClosing}
+                        className="p-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded disabled:opacity-50" title="Cancel">
+                        <X className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   ) : (
-                    <div className="flex items-stretch gap-2">
-                      <div className="flex-1 px-3 py-2.5 bg-white border-2 border-gray-200 rounded-lg">
-                        <div className={`text-2xl font-bold tabular-nums ${actual == null ? 'text-gray-300' : 'text-gray-900'}`}>
-                          {actual == null ? '— not entered —' : '₹' + fmtINR(actual)}
-                        </div>
-                      </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`text-lg font-bold tabular-nums ${actual == null ? 'text-amber-600' : 'text-gray-900'}`}>
+                        {actual == null ? '—' : '₹' + fmtINR(actual)}
+                      </span>
                       <button
-                        onClick={() => {
-                          setClosingDraft(actual != null ? String(actual) : '');
-                          setEditingClosing(true);
-                        }}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg inline-flex items-center gap-1.5"
+                        onClick={() => { setClosingDraft(actual != null ? String(actual) : ''); setEditingClosing(true); }}
+                        className="p-1 hover:bg-emerald-100 text-emerald-700 rounded"
+                        title={actual == null ? 'Enter closing' : 'Edit closing'}
                       >
-                        <Pencil className="w-4 h-4" /> {actual == null ? 'Enter' : 'Edit'}
+                        <Pencil className="w-3.5 h-3.5" />
                       </button>
-                    </div>
-                  )}
-
-                  {/* Derived sales preview */}
-                  {derived > 0 && (
-                    <div className="mt-3 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-1.5 inline-block">
-                      🟢 Auto-recorded as Cash Sales: <strong>+₹{fmtINR(derived)}</strong>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="bg-gray-100 px-5 py-2 text-[11px] text-gray-600 flex items-center justify-between">
-                <span>💡 Save the closing balance → system computes Cash Sales automatically</span>
+              {/* Hint strip: derived sales note + cash log link */}
+              <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 text-[11px] text-gray-600 flex items-center justify-between gap-2 flex-wrap">
+                {derived > 0 ? (
+                  <span className="text-emerald-700">
+                    🟢 Auto Cash Sales: <strong>+₹{fmtINR(derived)}</strong>
+                  </span>
+                ) : (
+                  <span>💡 Enter closing balance → Cash Sales computed automatically</span>
+                )}
                 <Link href="/manager/daily-book/cash-log" className="text-emerald-700 hover:text-emerald-800 underline">
                   See cash log →
                 </Link>
@@ -851,26 +830,29 @@ function BreakdownCard({
   );
 }
 
-// Single-line row used in the simplified "Today's Cash" card.
-function SimpleLine({
-  label, value, signed, colored, bold,
+// Compact vertical stat (label above value) used in the horizontal cash card.
+function Stat({
+  label, value, colored, bold, arrow, extraClass,
 }: {
   label: string;
   value: number;
-  signed?: '+' | '−';
   colored?: 'emerald' | 'rose';
   bold?: boolean;
+  arrow?: boolean;
+  extraClass?: string;
 }) {
-  const cls = colored === 'emerald' ? 'text-emerald-700'
+  const valueColor = colored === 'emerald' ? 'text-emerald-700'
     : colored === 'rose' ? 'text-rose-700'
     : 'text-gray-900';
-  const sign = signed ?? '';
   return (
-    <div className="flex items-baseline justify-between">
-      <span className={`${bold ? 'text-gray-900 font-semibold' : 'text-gray-700'} text-sm`}>{label}</span>
-      <span className={`text-base tabular-nums ${cls} ${bold ? 'font-bold' : 'font-semibold'}`}>
-        {value === 0 ? '—' : `${sign}₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value)}`}
-      </span>
+    <div className={`${extraClass ?? ''} text-left`}>
+      <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
+        {label}
+        {arrow && <span className="text-gray-400 group-hover:text-gray-700"> →</span>}
+      </div>
+      <div className={`text-lg tabular-nums ${valueColor} ${bold ? 'font-bold' : 'font-semibold'}`}>
+        ₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(value)}
+      </div>
     </div>
   );
 }
