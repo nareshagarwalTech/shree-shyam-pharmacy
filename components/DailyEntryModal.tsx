@@ -33,29 +33,44 @@ interface TypeOption {
   label: string;
   emoji: string;
   description: string;
+  /** Longer tooltip / banner shown when this type is the active selection. */
+  longHelp?: string;
   accent: string;          // tailwind classes for selected state
+  helpBg?: string;         // banner color when this type is selected
   txnType: TxnType;
   direction: EntryDirection | null;
   scope: EntryScope | null;
 }
 const TYPE_OPTIONS: TypeOption[] = [
-  { key: 'biz_income',  label: 'Business Income',  emoji: '🟢', description: 'Sales — POS, QR, online, cash',
+  { key: 'biz_income',  label: 'Business Income',  emoji: '🟢', description: 'Sales, refunds from suppliers',
+    longHelp: 'Money the pharmacy earned — walk-in sales, credit sales, refunds from suppliers. Counts toward Total Income on the dashboard.',
     accent: 'border-emerald-500 bg-emerald-50 ring-emerald-100',
+    helpBg: 'bg-emerald-50 border-emerald-200 text-emerald-900',
     txnType: 'entry', direction: 'income', scope: 'business' },
-  { key: 'biz_expense', label: 'Business Expense', emoji: '🔴', description: 'Purchase, salary, rent, bills',
+  { key: 'biz_expense', label: 'Business Expense', emoji: '🔴', description: 'Purchases, rent, salaries, bills',
+    longHelp: 'Money paid out for running the pharmacy — stock purchases, rent, electricity, salaries, bank charges. Reduces the account it was paid from.',
     accent: 'border-rose-500 bg-rose-50 ring-rose-100',
+    helpBg: 'bg-rose-50 border-rose-200 text-rose-900',
     txnType: 'entry', direction: 'expense', scope: 'business' },
-  { key: 'pers_income', label: 'Personal Income',  emoji: '🟢', description: 'Salary, gift, dividend, refund',
+  { key: 'pers_income', label: 'Personal Income',  emoji: '🟢', description: 'Salary credit, gifts, dividends',
+    longHelp: 'Personal money received into one of the same accounts (e.g. salary credit to HDFC, cash gift dropped in the drawer). Tracked separately so business sales are not inflated.',
     accent: 'border-emerald-500 bg-emerald-50 ring-emerald-100',
+    helpBg: 'bg-emerald-50 border-emerald-200 text-emerald-900',
     txnType: 'entry', direction: 'income', scope: 'personal' },
-  { key: 'pers_expense',label: 'Personal Expense', emoji: '🔴', description: 'Groceries, fuel, household',
+  { key: 'pers_expense',label: 'Personal Expense', emoji: '🔴', description: 'Groceries, fuel, family, household',
+    longHelp: 'Personal money spent from one of the same accounts (e.g. groceries paid in cash, school fees by online banking). Reduces the same account but does NOT appear in business expense totals.',
     accent: 'border-rose-500 bg-rose-50 ring-rose-100',
+    helpBg: 'bg-rose-50 border-rose-200 text-rose-900',
     txnType: 'entry', direction: 'expense', scope: 'personal' },
-  { key: 'cash_count',  label: 'Cash Count',       emoji: '💵', description: 'Physical cash on hand at close',
+  { key: 'cash_count',  label: 'Cash Count',       emoji: '💵', description: 'End-of-day drawer count',
+    longHelp: '💡 Not a transaction — a reconciliation snapshot. Records the actual cash in the drawer at end of day. The system uses it to auto-derive your Cash Sales: Derived = Closing − Opening + Expenses − Non-Sale Inflows − Manual Cash Sales. Tip: enter via the Closing Balance editor on the dashboard or the Denomination Counter for a faster flow.',
     accent: 'border-amber-500 bg-amber-50 ring-amber-100',
+    helpBg: 'bg-amber-50 border-amber-200 text-amber-900',
     txnType: 'cash_count', direction: null, scope: null },
   { key: 'transfer',    label: 'Account Transfer', emoji: '🔁', description: 'Move money between your accounts',
+    longHelp: '💡 Not an income or expense — moves money between two of YOUR accounts. Examples: deposit cash from drawer to HDFC, ATM withdrawal HDFC → CASH, wire HDFC → MAHESH BANK. Both balances adjust; nothing hits sales or expense totals.',
     accent: 'border-violet-500 bg-violet-50 ring-violet-100',
+    helpBg: 'bg-violet-50 border-violet-200 text-violet-900',
     txnType: 'transfer', direction: null, scope: null },
 ];
 
@@ -291,6 +306,7 @@ export default function DailyEntryModal({
                   type="button"
                   onClick={() => setTypeKey(t.key)}
                   disabled={isEdit}
+                  title={t.longHelp ?? t.description}
                   className={`text-left p-2.5 rounded-lg border transition ${
                     typeKey === t.key ? `${t.accent} ring-2` : 'border-gray-200 hover:border-gray-300 bg-white'
                   } ${isEdit ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -300,6 +316,13 @@ export default function DailyEntryModal({
                 </button>
               ))}
             </div>
+            {/* Contextual help banner for the selected type */}
+            {selectedType.longHelp && (
+              <div className={`mt-2 p-2.5 border rounded-lg text-xs leading-snug ${selectedType.helpBg ?? 'bg-gray-50 border-gray-200 text-gray-700'}`}>
+                <span className="font-semibold">{selectedType.emoji} {selectedType.label}</span>
+                <span className="ml-1.5">— {selectedType.longHelp}</span>
+              </div>
+            )}
             {isEdit && <div className="text-xs text-gray-400 mt-1">Type cannot be changed after creation.</div>}
           </div>
 
