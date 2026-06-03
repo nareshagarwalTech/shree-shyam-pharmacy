@@ -206,27 +206,53 @@ export default function DailyEntryModal({
     }
 
     setSaving(true);
-    const { error: dbErr } = entry
-      ? await supabase.from('daily_entries').update(payload).eq('id', entry.id)
-      : await supabase.from('daily_entries').insert(payload);
-    setSaving(false);
-
-    if (dbErr) { setError(dbErr.message); return; }
-    onSaved();
+    try {
+      const res = entry
+        ? await supabase.from('daily_entries').update(payload).eq('id', entry.id)
+        : await supabase.from('daily_entries').insert(payload);
+      if (res.error) {
+        console.error('Save failed:', res.error);
+        const code = res.error.code ? ` [${res.error.code}]` : '';
+        const detail = res.error.details ? `\nDetails: ${res.error.details}` : '';
+        setError(`Save failed${code}: ${res.error.message}${detail}`);
+        return;
+      }
+      onSaved();
+    } catch (e: any) {
+      console.error('Save threw:', e);
+      setError(`Unexpected error: ${e?.message ?? String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!entry) return;
     if (isLinked) {
-      setError('Auto-managed. Delete the source income entry instead.');
+      setError('This row is auto-managed. Edit the source income (the sale or closing balance) to change it.');
       return;
     }
     if (!confirm('Delete this entry?')) return;
+    setError(null);
     setSaving(true);
-    const { error: dbErr } = await supabase.from('daily_entries').delete().eq('id', entry.id);
-    setSaving(false);
-    if (dbErr) { setError(dbErr.message); return; }
-    onSaved();
+    try {
+      const res = await supabase.from('daily_entries').delete().eq('id', entry.id);
+      if (res.error) {
+        // Surface the full error so we can debug
+        console.error('Delete failed:', res.error);
+        const code = res.error.code ? ` [${res.error.code}]` : '';
+        const detail = res.error.details ? `\nDetails: ${res.error.details}` : '';
+        const hint = res.error.hint ? `\nHint: ${res.error.hint}` : '';
+        setError(`Delete failed${code}: ${res.error.message}${detail}${hint}`);
+        return;
+      }
+      onSaved();
+    } catch (e: any) {
+      console.error('Delete threw:', e);
+      setError(`Unexpected error: ${e?.message ?? String(e)}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   // -------- render -------- //
