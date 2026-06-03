@@ -284,6 +284,25 @@ export default function DailyBookPage() {
 
   const filteredCategoryName = filterCategoryId ? categoryById.get(filterCategoryId)?.name : null;
 
+  // Overall totals across ALL accounts (cash + banks) for the selected date.
+  // Refund-style expense categories (is_credit_note=true) flip sign and count
+  // as income.
+  const overallTotals = useMemo(() => {
+    let totalIn = 0, totalOut = 0;
+    for (const e of entries) {
+      if (e.txn_type !== 'entry') continue;
+      const cat = e.category_id ? categoryById.get(e.category_id) : null;
+      const isRefund = !!cat?.is_credit_note;
+      const amt = Number(e.txn_amount);
+      if (e.direction === 'income') totalIn += amt;
+      else if (e.direction === 'expense') {
+        if (isRefund) totalIn += amt;
+        else totalOut += amt;
+      }
+    }
+    return { totalIn, totalOut, net: totalIn - totalOut };
+  }, [entries, categoryById]);
+
   function renderEntryRow(e: DailyEntry) {
     const badge = typeBadge(e);
     const acct  = e.account_id ? accountById.get(e.account_id) : null;
@@ -465,8 +484,51 @@ export default function DailyBookPage() {
                   : <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Cash Short ₹{fmtINR(Math.abs(diff))}</span>}
               </div>
 
-              {/* Compact horizontal math row: Opening | Income | Expense | Expected | Closing */}
-              <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-5 gap-2 sm:divide-x sm:divide-gray-200">
+              {/* All Accounts overview — total income + expense + net across CASH + banks */}
+              <div className="px-4 py-3 grid grid-cols-3 gap-2 sm:divide-x sm:divide-gray-200 bg-gray-50/50">
+                <div className="text-left">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
+                    📊 All Accts · Income
+                  </div>
+                  <button
+                    onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'income' })}
+                    className="text-left hover:bg-emerald-50 rounded px-1 -mx-1 transition"
+                    title="Filter to all income entries"
+                  >
+                    <div className="text-lg font-bold tabular-nums text-emerald-700">
+                      +₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(overallTotals.totalIn)}
+                    </div>
+                  </button>
+                </div>
+                <div className="text-left sm:pl-3">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
+                    📊 All Accts · Expense
+                  </div>
+                  <button
+                    onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'expense' })}
+                    className="text-left hover:bg-rose-50 rounded px-1 -mx-1 transition"
+                    title="Filter to all expense entries"
+                  >
+                    <div className="text-lg font-bold tabular-nums text-rose-700">
+                      −₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(overallTotals.totalOut)}
+                    </div>
+                  </button>
+                </div>
+                <div className="text-left sm:pl-3">
+                  <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
+                    📊 Net Today
+                  </div>
+                  <div className={`text-lg font-bold tabular-nums ${overallTotals.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
+                    {overallTotals.net >= 0 ? '+' : '−'}₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.abs(overallTotals.net))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Cash-only reconciliation row */}
+              <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-t border-gray-200">
+                💵 Cash Reconciliation
+              </div>
+              <div className="px-4 pb-3 grid grid-cols-2 sm:grid-cols-5 gap-2 sm:divide-x sm:divide-gray-200">
                 <Stat label="Opening" value={opening} />
                 <button
                   onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'income' })}
