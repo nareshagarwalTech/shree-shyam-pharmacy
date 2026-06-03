@@ -17,6 +17,7 @@ import {
   ArrowLeft, Plus, RefreshCw, Calendar,
   Wallet, Landmark, ArrowRight, Settings, Coins,
   AlertTriangle, CheckCircle2, Pencil, Save, X,
+  Receipt, TrendingDown, TrendingUp, Filter,
 } from 'lucide-react';
 import DailyEntryModal from '@/components/DailyEntryModal';
 
@@ -77,10 +78,38 @@ function typeBadge(e: DailyEntry): { label: string; cls: string } {
 type FilterScope     = 'all' | EntryScope;
 type FilterDirection = 'all' | EntryDirection;
 
+interface CategoryBreakdownRow {
+  categoryId: string;
+  categoryName: string;
+  scope: EntryScope;
+  total: number;
+  count: number;
+  isCreditNote: boolean;
+}
+
 export default function DailyBookPage() {
   const [date, setDate] = useState(todayISO());
   const [filterScope, setFilterScope]         = useState<FilterScope>('all');
   const [filterDirection, setFilterDirection] = useState<FilterDirection>('all');
+  const [filterCategoryId, setFilterCategoryId] = useState<string | null>(null);
+
+  // Convenience helper for filter pill / breakdown clicks
+  const applyFilter = useCallback((opts: { categoryId?: string | null; scope?: FilterScope; direction?: FilterDirection }) => {
+    if (opts.categoryId !== undefined) setFilterCategoryId(opts.categoryId);
+    if (opts.scope !== undefined) setFilterScope(opts.scope);
+    if (opts.direction !== undefined) setFilterDirection(opts.direction);
+    // Scroll to entries list
+    setTimeout(() => {
+      const el = document.getElementById('entries-list');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, []);
+  const clearFilters = useCallback(() => {
+    setFilterCategoryId(null);
+    setFilterScope('all');
+    setFilterDirection('all');
+  }, []);
+  const filtersActive = filterCategoryId !== null || filterScope !== 'all' || filterDirection !== 'all';
 
   const [entries, setEntries] = useState<DailyEntry[]>([]);
   const [accounts, setAccounts]   = useState<Account[]>([]);
@@ -193,21 +222,67 @@ export default function DailyBookPage() {
   }, [loadLookups, loadEntries]);
   useEffect(() => { if (!loading) loadEntries(); }, [date, loading, loadEntries]);
 
-  // Filtered + totals (4-bucket)
+  // Filtered entries based on scope/direction/category filters
   const visible = useMemo(() => {
     return entries.filter((e) => {
-      if (filterScope !== 'all' && e.scope !== filterScope) {
-        // cash_count and transfer have null scope — keep them visible only when scope=='all'
-        if (e.txn_type === 'entry') return false;
-        return false;
-      }
-      if (filterDirection !== 'all' && e.direction !== filterDirection) {
-        if (e.txn_type === 'entry') return false;
-        return false;
-      }
+      if (filterScope !== 'all' && e.scope !== filterScope) return false;
+      if (filterDirection !== 'all' && e.direction !== filterDirection) return false;
+      if (filterCategoryId !== null && e.category_id !== filterCategoryId) return false;
       return true;
     });
-  }, [entries, filterScope, filterDirection]);
+  }, [entries, filterScope, filterDirection, filterCategoryId]);
+
+  // Per-category breakdown of EXPENSE entries for the selected date
+  const expenseBreakdown = useMemo<CategoryBreakdownRow[]>(() => {
+    const m = new Map<string, CategoryBreakdownRow>();
+    for (const e of entries) {
+      if (e.txn_type !== 'entry' || e.direction !== 'expense' || !e.category_id) continue;
+      const cat = categoryById.get(e.category_id);
+      if (!cat) continue;
+      const cur = m.get(cat.id) ?? {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        scope: cat.scope,
+        total: 0,
+        count: 0,
+        isCreditNote: cat.is_credit_note,
+      };
+      cur.total += Number(e.txn_amount);
+      cur.count += 1;
+      m.set(cat.id, cur);
+    }
+    return [...m.values()].sort((a, b) => {
+      if (a.scope !== b.scope) return a.scope === 'business' ? -1 : 1;
+      return b.total - a.total;
+    });
+  }, [entries, categoryById]);
+
+  // Per-category breakdown of INCOME entries for the selected date
+  const incomeBreakdown = useMemo<CategoryBreakdownRow[]>(() => {
+    const m = new Map<string, CategoryBreakdownRow>();
+    for (const e of entries) {
+      if (e.txn_type !== 'entry' || e.direction !== 'income' || !e.category_id) continue;
+      const cat = categoryById.get(e.category_id);
+      if (!cat) continue;
+      const cur = m.get(cat.id) ?? {
+        categoryId: cat.id,
+        categoryName: cat.name,
+        scope: cat.scope,
+        total: 0,
+        count: 0,
+        isCreditNote: false,
+      };
+      cur.total += Number(e.txn_amount);
+      cur.count += 1;
+      m.set(cat.id, cur);
+    }
+    return [...m.values()].sort((a, b) => {
+      if (a.scope !== b.scope) return a.scope === 'business' ? -1 : 1;
+      return b.total - a.total;
+    });
+  }, [entries, categoryById]);
+
+  const filteredCategoryName = filterCategoryId ? categoryById.get(filterCategoryId)?.name : null;
 
   function renderEntryRow(e: DailyEntry) {
     const badge = typeBadge(e);
@@ -390,11 +465,23 @@ export default function DailyBookPage() {
                   : <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Cash Short ₹{fmtINR(Math.abs(diff))}</span>}
               </div>
 
-              {/* The simple 4-line math */}
+              {/* The simple 4-line math — Net Income / Net Expense clickable to filter */}
               <div className="px-5 py-4 space-y-2.5 max-w-md mx-auto">
                 <SimpleLine label="Opening Balance" value={opening} bold />
-                <SimpleLine label="Net Income (today)"  value={netIncome}  signed="+" colored="emerald" />
-                <SimpleLine label="Net Expense (today)" value={netExpense} signed="−" colored="rose" />
+                <button
+                  onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'income' })}
+                  className="w-full hover:bg-emerald-50 rounded px-1 -mx-1 transition"
+                  title="Click to filter entries: Income only"
+                >
+                  <SimpleLine label="Net Income (today) →"  value={netIncome}  signed="+" colored="emerald" />
+                </button>
+                <button
+                  onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'expense' })}
+                  className="w-full hover:bg-rose-50 rounded px-1 -mx-1 transition"
+                  title="Click to filter entries: Expenses only"
+                >
+                  <SimpleLine label="Net Expense (today) →" value={netExpense} signed="−" colored="rose" />
+                </button>
                 <div className="border-t border-dashed border-gray-300 pt-2.5 flex items-baseline justify-between">
                   <span className="text-sm text-gray-600 font-medium">Expected Closing</span>
                   <span className="text-lg font-bold tabular-nums text-gray-900">₹{fmtINR(expected)}</span>
@@ -473,6 +560,38 @@ export default function DailyBookPage() {
             </div>
           );
         })()}
+
+        {/* === Today's Breakdown — clickable Income + Expense by category === */}
+        {!loading && (expenseBreakdown.length > 0 || incomeBreakdown.length > 0) && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {incomeBreakdown.length > 0 && (
+              <BreakdownCard
+                title="Today's Income"
+                icon={TrendingUp}
+                iconColor="text-emerald-600"
+                headerBg="bg-emerald-50/40"
+                amountColor="text-emerald-700"
+                amountSign="+"
+                rows={incomeBreakdown}
+                onRowClick={(r) => applyFilter({ categoryId: r.categoryId, scope: r.scope, direction: 'income' })}
+                onScopeClick={(scope) => applyFilter({ categoryId: null, scope, direction: 'income' })}
+              />
+            )}
+            {expenseBreakdown.length > 0 && (
+              <BreakdownCard
+                title="Today's Expenses"
+                icon={TrendingDown}
+                iconColor="text-rose-600"
+                headerBg="bg-rose-50/40"
+                amountColor="text-rose-700"
+                amountSign="−"
+                rows={expenseBreakdown}
+                onRowClick={(r) => applyFilter({ categoryId: r.categoryId, scope: r.scope, direction: 'expense' })}
+                onScopeClick={(scope) => applyFilter({ categoryId: null, scope, direction: 'expense' })}
+              />
+            )}
+          </div>
+        )}
 
         {/* === BANK ACCOUNTS row — compact, one chip per bank account ====== */}
         {!loading && balances.filter((b) => b.account_kind !== 'cash').length > 0 && (
@@ -575,12 +694,42 @@ export default function DailyBookPage() {
           </div>
         )}
 
+        {/* Filter pill — shown only when any filter is active */}
+        {filtersActive && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-3 py-2 flex items-center gap-2 flex-wrap text-sm">
+            <Filter className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+            <span className="text-indigo-900 font-medium">Filtered:</span>
+            {filteredCategoryName && (
+              <span className="px-2 py-0.5 bg-white border border-indigo-200 rounded text-indigo-800 text-xs font-semibold">
+                📁 {filteredCategoryName}
+              </span>
+            )}
+            {filterScope !== 'all' && (
+              <span className="px-2 py-0.5 bg-white border border-indigo-200 rounded text-indigo-800 text-xs font-semibold">
+                {filterScope}
+              </span>
+            )}
+            {filterDirection !== 'all' && (
+              <span className="px-2 py-0.5 bg-white border border-indigo-200 rounded text-indigo-800 text-xs font-semibold">
+                {filterDirection}
+              </span>
+            )}
+            <span className="text-indigo-700 text-xs">· showing {visible.length} of {entries.length}</span>
+            <button
+              onClick={clearFilters}
+              className="ml-auto text-xs px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded font-semibold inline-flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
+          </div>
+        )}
+
         {/* Entries */}
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <div id="entries-list" className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
             <div className="font-semibold text-gray-900">
               {visible.length} {visible.length === 1 ? 'entry' : 'entries'}
-              {(filterScope !== 'all' || filterDirection !== 'all') && (
+              {filtersActive && (
                 <span className="text-sm text-gray-500 ml-2 font-normal">filtered from {entries.length}</span>
               )}
             </div>
@@ -590,10 +739,15 @@ export default function DailyBookPage() {
             <div className="py-12 text-center text-gray-400">Loading…</div>
           ) : visible.length === 0 ? (
             <div className="py-12 text-center text-gray-400">
-              No entries for this date {(filterScope !== 'all' || filterDirection !== 'all') && '(in filter)'}.
+              No entries for this date{filtersActive && ' matching the filter'}.
               <div className="mt-2">
-                <button onClick={() => { setEditing(null); setModalOpen(true); }}
-                  className="text-indigo-600 hover:text-indigo-700 underline text-sm">Add the first one</button>
+                {filtersActive ? (
+                  <button onClick={clearFilters}
+                    className="text-indigo-600 hover:text-indigo-700 underline text-sm">Clear filter</button>
+                ) : (
+                  <button onClick={() => { setEditing(null); setModalOpen(true); }}
+                    className="text-indigo-600 hover:text-indigo-700 underline text-sm">Add the first one</button>
+                )}
               </div>
             </div>
           ) : (
@@ -612,6 +766,87 @@ export default function DailyBookPage() {
         modes={modes}
         defaultDate={date}
       />
+    </div>
+  );
+}
+
+// Generic breakdown card used for Today's Income and Today's Expenses.
+function BreakdownCard({
+  title, icon: Icon, iconColor, headerBg, amountColor, amountSign,
+  rows, onRowClick, onScopeClick,
+}: {
+  title: string;
+  icon: typeof Receipt;
+  iconColor: string;
+  headerBg: string;
+  amountColor: string;
+  amountSign: '+' | '−';
+  rows: CategoryBreakdownRow[];
+  onRowClick: (r: CategoryBreakdownRow) => void;
+  onScopeClick: (scope: EntryScope) => void;
+}) {
+  const bizRows = rows.filter((r) => r.scope === 'business');
+  const persRows = rows.filter((r) => r.scope === 'personal');
+  const bizTotal = bizRows.reduce((s, r) => s + r.total, 0);
+  const persTotal = persRows.reduce((s, r) => s + r.total, 0);
+  const grandTotal = bizTotal + persTotal;
+
+  const fmt = (n: number) => new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(n);
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+      <div className={`px-4 py-3 border-b border-gray-200 ${headerBg} flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <Icon className={`w-4 h-4 ${iconColor}`} />
+          <div className="font-semibold text-gray-900 text-sm">{title}</div>
+        </div>
+        <div className={`font-bold tabular-nums ${amountColor}`}>{amountSign}₹{fmt(grandTotal)}</div>
+      </div>
+      <div>
+        {bizRows.length > 0 && (
+          <>
+            <button onClick={() => onScopeClick('business')}
+              className="w-full px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-left text-xs font-semibold text-amber-800 uppercase tracking-wider flex items-center justify-between transition">
+              <span>Business</span>
+              <span className="tabular-nums">{amountSign}₹{fmt(bizTotal)}</span>
+            </button>
+            {bizRows.map((r) => (
+              <button key={r.categoryId} onClick={() => onRowClick(r)}
+                className="w-full px-3 py-2 hover:bg-gray-50 text-left text-sm flex items-center justify-between border-b border-gray-50 last:border-0 transition">
+                <span className="text-gray-800 truncate flex-1 min-w-0">
+                  📁 {r.categoryName}
+                  {r.isCreditNote && <span className="text-emerald-600 text-[10px] font-medium ml-1">(refund)</span>}
+                  <span className="text-gray-400 text-xs ml-2">×{r.count}</span>
+                </span>
+                <span className={`tabular-nums font-semibold ${amountColor} ml-2`}>{amountSign}₹{fmt(r.total)}</span>
+              </button>
+            ))}
+          </>
+        )}
+        {persRows.length > 0 && (
+          <>
+            <button onClick={() => onScopeClick('personal')}
+              className="w-full px-3 py-1.5 bg-violet-50 hover:bg-violet-100 text-left text-xs font-semibold text-violet-800 uppercase tracking-wider flex items-center justify-between transition">
+              <span>Personal</span>
+              <span className="tabular-nums">{amountSign}₹{fmt(persTotal)}</span>
+            </button>
+            {persRows.map((r) => (
+              <button key={r.categoryId} onClick={() => onRowClick(r)}
+                className="w-full px-3 py-2 hover:bg-gray-50 text-left text-sm flex items-center justify-between border-b border-gray-50 last:border-0 transition">
+                <span className="text-gray-800 truncate flex-1 min-w-0">
+                  📁 {r.categoryName}
+                  {r.isCreditNote && <span className="text-emerald-600 text-[10px] font-medium ml-1">(refund)</span>}
+                  <span className="text-gray-400 text-xs ml-2">×{r.count}</span>
+                </span>
+                <span className={`tabular-nums font-semibold ${amountColor} ml-2`}>{amountSign}₹{fmt(r.total)}</span>
+              </button>
+            ))}
+          </>
+        )}
+      </div>
+      <div className="px-3 py-2 text-[10px] text-gray-500 bg-gray-50 border-t border-gray-200">
+        💡 Click any row to filter the entries list
+      </div>
     </div>
   );
 }
