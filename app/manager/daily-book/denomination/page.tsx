@@ -74,21 +74,40 @@ export default function DenominationPage() {
 
     setSaving(true);
     try {
-      // 1. Create the CASH COUNT daily_entry (new schema: txn_type='cash_count')
-      const { data: entryData, error: entryErr } = await supabase
+      // 1. Upsert the CASH COUNT daily_entry — only one per (date, account) is
+      //    allowed by the unique index (migration 025). Reuse existing row if
+      //    present, else insert fresh.
+      const { data: existing } = await supabase
         .from('daily_entries')
-        .insert({
-          entry_date: date,
-          txn_type: 'cash_count',
-          narration: 'CLOSING BALANCE',
-          txn_amount: grandTotal,
-          account_id: cashAccount.id,
-        })
         .select('id')
-        .single();
-      if (entryErr) throw new Error(entryErr.message);
+        .eq('entry_date', date)
+        .eq('txn_type', 'cash_count')
+        .eq('account_id', cashAccount.id)
+        .maybeSingle();
 
-      const dailyEntryId = (entryData as Pick<DailyEntry, 'id'>).id;
+      let dailyEntryId: string;
+      if (existing?.id) {
+        const { error: upErr } = await supabase
+          .from('daily_entries')
+          .update({ txn_amount: grandTotal, narration: 'CLOSING BALANCE' })
+          .eq('id', existing.id);
+        if (upErr) throw new Error(upErr.message);
+        dailyEntryId = existing.id;
+      } else {
+        const { data: created, error: insErr } = await supabase
+          .from('daily_entries')
+          .insert({
+            entry_date: date,
+            txn_type: 'cash_count',
+            narration: 'CLOSING BALANCE',
+            txn_amount: grandTotal,
+            account_id: cashAccount.id,
+          })
+          .select('id')
+          .single();
+        if (insErr) throw new Error(insErr.message);
+        dailyEntryId = (created as Pick<DailyEntry, 'id'>).id;
+      }
 
       // 2. Upsert each denomination row (one per denom per date)
       const denomRows = rows
