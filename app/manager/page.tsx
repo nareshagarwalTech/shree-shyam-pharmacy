@@ -12,6 +12,7 @@ import {
   Wallet,
   Tags,
   CreditCard,
+  Scale,
 } from 'lucide-react';
 import { PHARMACY_INFO } from '@/lib/constants';
 
@@ -40,6 +41,14 @@ const TILES: Tile[] = [
     icon: Calculator,
     iconBg: 'bg-amber-100',
     iconColor: 'text-amber-600',
+  },
+  {
+    href: '/manager/daily-book/cash-log',
+    title: 'Cash Log',
+    desc: 'Daily history: opening, closing, derived sales, expenses. Totals row.',
+    icon: Scale,
+    iconBg: 'bg-emerald-100',
+    iconColor: 'text-emerald-600',
   },
   {
     href: '/manager/daily-book/banks',

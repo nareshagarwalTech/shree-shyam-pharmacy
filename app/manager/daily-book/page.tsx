@@ -17,8 +17,25 @@ import {
   ArrowLeft, Plus, RefreshCw, Calendar,
   TrendingUp, Wallet, Briefcase, Home,
   Landmark, ArrowRight, Settings, Coins,
+  Scale, AlertTriangle, CheckCircle2, Pencil, Save, X,
 } from 'lucide-react';
 import DailyEntryModal from '@/components/DailyEntryModal';
+
+interface CashRecon {
+  entry_date: string;
+  cash_account_id: string;
+  opening: number | string;
+  non_sale_in: number | string;
+  cr_note_in: number | string;
+  deposits_in: number | string;
+  expenses: number | string;
+  deposits_out: number | string;
+  manual_sales: number | string;
+  expected_closing: number | string;
+  actual_closing: number | string | null;
+  derived_sales: number | string;
+  cash_diff: number | string;
+}
 
 interface BalanceRow {
   account_id: string;
@@ -72,6 +89,10 @@ export default function DailyBookPage() {
   const [modes, setModes]         = useState<PaymentMode[]>([]);
   const [balances, setBalances]   = useState<BalanceRow[]>([]);
   const [funds, setFunds]         = useState<FundBalance[]>([]);
+  const [cashRecon, setCashRecon] = useState<CashRecon | null>(null);
+  const [savingClosing, setSavingClosing] = useState(false);
+  const [editingClosing, setEditingClosing] = useState(false);
+  const [closingDraft, setClosingDraft] = useState('');
   const [loading, setLoading]     = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -94,7 +115,7 @@ export default function DailyBookPage() {
 
   const loadEntries = useCallback(async () => {
     setRefreshing(true);
-    const [entriesRes, balancesRes, fundsRes] = await Promise.all([
+    const [entriesRes, balancesRes, fundsRes, reconRes] = await Promise.all([
       supabase
         .from('daily_entries')
         .select('*')
@@ -105,12 +126,63 @@ export default function DailyBookPage() {
         .from('daily_book_fund_balances')
         .select('*')
         .eq('is_active', true),
+      supabase.rpc('cash_day_reconciliation', { p_date: date }),
     ]);
     setEntries((entriesRes.data ?? []) as DailyEntry[]);
     setBalances((balancesRes.data ?? []) as BalanceRow[]);
     setFunds((fundsRes.data ?? []) as FundBalance[]);
+    const reconArr = (reconRes.data ?? []) as CashRecon[];
+    setCashRecon(reconArr.length > 0 ? reconArr[0] : null);
     setRefreshing(false);
   }, [date]);
+
+  // Save the closing balance for the day (creates or updates the cash_count entry).
+  const saveClosingBalance = useCallback(async () => {
+    if (!cashRecon?.cash_account_id) return;
+    const amt = parseFloat(closingDraft);
+    if (!Number.isFinite(amt) || amt < 0) {
+      alert('Enter a valid closing balance (non-negative number).');
+      return;
+    }
+    setSavingClosing(true);
+    try {
+      // Find existing cash_count for this date
+      const { data: existing } = await supabase
+        .from('daily_entries')
+        .select('id')
+        .eq('entry_date', date)
+        .eq('txn_type', 'cash_count')
+        .eq('account_id', cashRecon.cash_account_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existing?.id) {
+        const { error } = await supabase
+          .from('daily_entries')
+          .update({ txn_amount: amt })
+          .eq('id', existing.id);
+        if (error) throw new Error(error.message);
+      } else {
+        const { error } = await supabase
+          .from('daily_entries')
+          .insert({
+            entry_date: date,
+            txn_type: 'cash_count',
+            account_id: cashRecon.cash_account_id,
+            txn_amount: amt,
+            narration: 'CLOSING BALANCE',
+          });
+        if (error) throw new Error(error.message);
+      }
+      setEditingClosing(false);
+      await loadEntries();
+    } catch (e: any) {
+      alert('Failed to save: ' + (e?.message ?? 'unknown error'));
+    } finally {
+      setSavingClosing(false);
+    }
+  }, [date, closingDraft, cashRecon, loadEntries]);
 
   useEffect(() => {
     (async () => {
@@ -366,6 +438,153 @@ export default function DailyBookPage() {
           )}
         </div>
 
+        {/* Cash Day Reconciliation card — drives derived Cash Sales */}
+        {cashRecon && (() => {
+          const opening = Number(cashRecon.opening);
+          const nonSaleIn = Number(cashRecon.non_sale_in);
+          const crNoteIn = Number(cashRecon.cr_note_in);
+          const depositsIn = Number(cashRecon.deposits_in);
+          const expenses = Number(cashRecon.expenses);
+          const depositsOut = Number(cashRecon.deposits_out);
+          const manualSales = Number(cashRecon.manual_sales);
+          const expected = Number(cashRecon.expected_closing);
+          const actual = cashRecon.actual_closing == null ? null : Number(cashRecon.actual_closing);
+          const derived = Number(cashRecon.derived_sales);
+          const diff = Number(cashRecon.cash_diff);
+          const balanced = Math.abs(diff) < 0.01;
+          const cashShort = actual != null && diff < -0.01;
+
+          return (
+            <div className={`bg-white rounded-2xl border-2 overflow-hidden ${
+              actual == null ? 'border-amber-300'
+                : cashShort ? 'border-rose-300'
+                : 'border-emerald-300'
+            }`}>
+              <div className={`px-4 py-3 border-b flex items-center justify-between ${
+                actual == null ? 'bg-amber-50/70 border-amber-200'
+                  : cashShort ? 'bg-rose-50/70 border-rose-200'
+                  : 'bg-emerald-50/70 border-emerald-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Scale className="w-5 h-5 text-gray-700" />
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">Cash Day Reconciliation</div>
+                    <div className="text-xs text-gray-500">CASH drawer · {date}</div>
+                  </div>
+                </div>
+                {actual == null && (
+                  <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded">
+                    ⚠ Closing not entered
+                  </span>
+                )}
+                {actual != null && balanced && (
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded inline-flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5" /> Balanced
+                  </span>
+                )}
+                {actual != null && cashShort && (
+                  <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded inline-flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" /> Cash Short ₹{fmtINR(Math.abs(diff))}
+                  </span>
+                )}
+              </div>
+
+              <div className="p-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+                {/* Left: Inflows */}
+                <div className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Inflows</div>
+                  <Row label="Opening" value={opening} positive />
+                  <Row label="Manual Cash Sales" value={manualSales} positive subtle />
+                  <Row label="Non-Sale Cash In" value={nonSaleIn} positive subtle />
+                  <Row label="Refunds (CR.Note)" value={crNoteIn} positive subtle />
+                  <Row label="Transfers In" value={depositsIn} positive subtle />
+                </div>
+
+                {/* Middle: Outflows */}
+                <div className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Outflows</div>
+                  <Row label="Cash Expenses" value={expenses} negative />
+                  <Row label="Transfers Out (to bank)" value={depositsOut} negative />
+                  <div className="pt-2 border-t border-gray-200">
+                    <div className="text-xs text-gray-600">
+                      Expected Closing (before derived):
+                    </div>
+                    <div className="text-lg font-bold tabular-nums text-gray-900">₹{fmtINR(expected)}</div>
+                  </div>
+                </div>
+
+                {/* Right: Actual + Derived */}
+                <div className="space-y-2 text-sm">
+                  <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Closing</div>
+
+                  <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+                    <div className="text-xs text-gray-600">Actual Closing Balance</div>
+                    {editingClosing ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={closingDraft}
+                          onChange={(e) => setClosingDraft(e.target.value)}
+                          autoFocus
+                          className="flex-1 px-2 py-1.5 border border-emerald-300 rounded-lg text-lg font-bold focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100"
+                        />
+                        <button
+                          onClick={saveClosingBalance}
+                          disabled={savingClosing}
+                          className="p-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-50"
+                          title="Save"
+                        >
+                          <Save className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setEditingClosing(false)}
+                          disabled={savingClosing}
+                          className="p-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded disabled:opacity-50"
+                          title="Cancel"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-baseline justify-between">
+                        <div className={`text-2xl font-bold tabular-nums ${actual == null ? 'text-amber-700' : 'text-gray-900'}`}>
+                          {actual == null ? '—' : '₹' + fmtINR(actual)}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setClosingDraft(actual != null ? String(actual) : '');
+                            setEditingClosing(true);
+                          }}
+                          className="text-xs text-emerald-700 hover:text-emerald-800 px-2 py-1 rounded hover:bg-emerald-100 inline-flex items-center gap-1"
+                        >
+                          <Pencil className="w-3 h-3" /> {actual == null ? 'Enter' : 'Edit'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="bg-emerald-50/60 rounded-lg p-3">
+                    <div className="text-xs text-emerald-800 font-medium">
+                      🟢 Derived Cash Sales (auto)
+                    </div>
+                    <div className="text-xl font-bold tabular-nums text-emerald-700">
+                      {derived > 0 ? '+₹' + fmtINR(derived) : '—'}
+                    </div>
+                    <div className="text-[10px] text-emerald-700 mt-0.5">
+                      auto-entered as BIZ-IN · Sales (Walk-in) · Cash
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 border-t border-gray-200 px-4 py-2 text-[11px] text-gray-600">
+                💡 Closing = Opening + ManualSales + Inflows − Outflows + DerivedSales. The system back-calculates Derived to fit the closing you enter; it shows up in your sales totals automatically.
+                {' '}<Link href="/manager/daily-book/cash-log" className="text-emerald-700 hover:text-emerald-800 underline ml-1">See cash log →</Link>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Fund Balances panel — only when at least one active shared category exists */}
         {!loading && funds.length > 0 && (
           <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -504,6 +723,27 @@ function Tile({
         <div className="text-xs text-gray-600 font-medium">{label}</div>
       </div>
       <div className={`text-xl font-bold ${cls.text}`}>₹{new Intl.NumberFormat('en-IN').format(value)}</div>
+    </div>
+  );
+}
+
+function Row({
+  label, value, positive, negative, subtle,
+}: { label: string; value: number; positive?: boolean; negative?: boolean; subtle?: boolean }) {
+  const sign = negative ? '−' : '';
+  const cls = value === 0
+    ? 'text-gray-400'
+    : negative
+      ? 'text-rose-700'
+      : positive
+        ? 'text-emerald-700'
+        : 'text-gray-800';
+  return (
+    <div className={`flex items-baseline justify-between ${subtle ? 'text-xs' : ''}`}>
+      <span className={subtle ? 'text-gray-500' : 'text-gray-700 font-medium'}>{label}</span>
+      <span className={`font-semibold tabular-nums ${cls}`}>
+        {value === 0 ? '—' : `${sign}₹${new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 }).format(value)}`}
+      </span>
     </div>
   );
 }
