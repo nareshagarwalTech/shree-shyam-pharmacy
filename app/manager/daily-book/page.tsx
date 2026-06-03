@@ -473,27 +473,34 @@ export default function DailyBookPage() {
                 <div className="flex items-center gap-2">
                   <Wallet className="w-5 h-5 text-gray-800" />
                   <div>
-                    <div className="font-display font-bold text-gray-900">Today&apos;s Cash</div>
-                    <div className="text-xs text-gray-500">CASH drawer · {date}</div>
+                    <div className="font-display font-bold text-gray-900">Today&apos;s Summary</div>
+                    <div className="text-xs text-gray-500">{date}</div>
                   </div>
                 </div>
                 {actual == null
-                  ? <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded">⚠ Closing not entered</span>
+                  ? <span className="text-xs font-semibold text-amber-700 bg-amber-100 px-2 py-1 rounded">⚠ Cash drawer not counted</span>
                   : balanced
-                  ? <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Balanced</span>
+                  ? <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded inline-flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Cash Balanced</span>
                   : <span className="text-xs font-semibold text-rose-700 bg-rose-100 px-2 py-1 rounded inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" /> Cash Short ₹{fmtINR(Math.abs(diff))}</span>}
               </div>
 
-              {/* All Accounts overview — total income + expense + net across CASH + banks */}
-              <div className="px-4 py-3 grid grid-cols-3 gap-2 sm:divide-x sm:divide-gray-200 bg-gray-50/50">
+              {/* ── Section 1: Overall — all accounts combined ── */}
+              <div className="px-4 pt-3 pb-1 flex items-center justify-between">
+                <div className="text-[11px] font-bold tracking-wider text-indigo-700 uppercase inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></span>
+                  Overall · CASH + Banks
+                </div>
+                <div className="text-[10px] text-gray-400">all accounts combined</div>
+              </div>
+              <div className="px-4 pb-3 grid grid-cols-3 gap-2 sm:divide-x sm:divide-gray-200">
                 <div className="text-left">
                   <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
-                    📊 All Accts · Income
+                    Total Income
                   </div>
                   <button
                     onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'income' })}
                     className="text-left hover:bg-emerald-50 rounded px-1 -mx-1 transition"
-                    title="Filter to all income entries"
+                    title="Filter entries to all income"
                   >
                     <div className="text-lg font-bold tabular-nums text-emerald-700">
                       +₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(overallTotals.totalIn)}
@@ -502,12 +509,12 @@ export default function DailyBookPage() {
                 </div>
                 <div className="text-left sm:pl-3">
                   <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
-                    📊 All Accts · Expense
+                    Total Expense
                   </div>
                   <button
                     onClick={() => applyFilter({ categoryId: null, scope: 'all', direction: 'expense' })}
                     className="text-left hover:bg-rose-50 rounded px-1 -mx-1 transition"
-                    title="Filter to all expense entries"
+                    title="Filter entries to all expenses"
                   >
                     <div className="text-lg font-bold tabular-nums text-rose-700">
                       −₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(overallTotals.totalOut)}
@@ -516,7 +523,7 @@ export default function DailyBookPage() {
                 </div>
                 <div className="text-left sm:pl-3">
                   <div className="text-[10px] uppercase tracking-wider text-gray-500 font-semibold mb-0.5">
-                    📊 Net Today
+                    Net (Income − Expense)
                   </div>
                   <div className={`text-lg font-bold tabular-nums ${overallTotals.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {overallTotals.net >= 0 ? '+' : '−'}₹{new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 }).format(Math.abs(overallTotals.net))}
@@ -524,9 +531,13 @@ export default function DailyBookPage() {
                 </div>
               </div>
 
-              {/* Cash-only reconciliation row */}
-              <div className="px-4 pt-2.5 pb-1 text-[10px] uppercase tracking-wider text-gray-500 font-semibold border-t border-gray-200">
-                💵 Cash Reconciliation
+              {/* ── Section 2: Cash Drawer only — for reconciliation ── */}
+              <div className="px-4 pt-3 pb-1 flex items-center justify-between border-t border-gray-200">
+                <div className="text-[11px] font-bold tracking-wider text-amber-700 uppercase inline-flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>
+                  Cash Drawer · Reconcile
+                </div>
+                <div className="text-[10px] text-gray-400">counts only entries on CASH</div>
               </div>
               <div className="px-4 pb-3 grid grid-cols-2 sm:grid-cols-5 gap-2 sm:divide-x sm:divide-gray-200">
                 <Stat label="Opening" value={opening} />
