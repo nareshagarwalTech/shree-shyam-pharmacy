@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { supabase, Cheque, Bank, Party, ChequeStatus } from '@/lib/supabase';
+import { supabase, Cheque, Account, Category, Party, ChequeStatus } from '@/lib/supabase';
 import { todayISO } from '@/lib/utils';
 import useEscapeKey from '@/lib/useEscapeKey';
 import {
@@ -17,7 +17,11 @@ interface Props {
   /** Existing cheque to edit, or null/undefined to add a new one */
   cheque?: Cheque | null;
   parties: Party[];
-  banks: Bank[];
+  /** All active accounts — replaces the legacy `banks` prop (migration 026). */
+  accounts: Account[];
+  /** Business-expense categories — drives the expense-category picker
+   *  (migration 027 — cheques.expense_category_id). */
+  expenseCategories: Category[];
   onClose: () => void;
   onSaved: () => void;
   onError: (m: string) => void;
@@ -31,17 +35,19 @@ const STATUS_OPTIONS: { value: ChequeStatus; label: string }[] = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
-export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, onError }: Props) {
+export default function ChequeModal({ cheque, parties, accounts, expenseCategories, onClose, onSaved, onError }: Props) {
   const isEdit = !!cheque?.id;
 
-  const defaultBankId = useMemo(
-    () => banks.find((b) => b.is_default)?.id ?? banks[0]?.id ?? null,
-    [banks],
+  // Default to the first bank account (kind='bank') when adding new cheques.
+  const defaultAccountId = useMemo(
+    () => accounts.find((a) => a.kind === 'bank')?.id ?? accounts[0]?.id ?? null,
+    [accounts],
   );
 
-  const [partyId, setPartyId]         = useState<string | null>(cheque?.party_id ?? null);
-  const [bankId, setBankId]           = useState<string | null>(cheque?.bank_id ?? defaultBankId);
-  const [isOnline, setIsOnline]       = useState<boolean>(cheque?.is_online ?? false);
+  const [partyId, setPartyId]           = useState<string | null>(cheque?.party_id ?? null);
+  const [accountId, setAccountId]       = useState<string | null>(cheque?.account_id ?? defaultAccountId);
+  const [categoryId, setCategoryId]     = useState<string | null>(cheque?.expense_category_id ?? null);
+  const [isOnline, setIsOnline]         = useState<boolean>(cheque?.is_online ?? false);
   const [chequeNo, setChequeNo]       = useState<string>(cheque?.cheque_no ?? '');
   const [onlineRef, setOnlineRef]     = useState<string>(cheque?.online_ref ?? '');
   const [amount, setAmount]           = useState<number>(Number(cheque?.amount ?? 0));
@@ -80,6 +86,7 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
 
   const validate = (): string | null => {
     if (!partyId) return 'Please select a party';
+    if (!accountId) return 'Please select an account';
     if (amount <= 0) return 'Amount must be greater than 0';
     if (!issueDate) return 'Cheque date is required';
     if (!isOnline && !chequeNo.trim()) return 'Cheque number is required (or toggle Online)';
@@ -88,6 +95,10 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
     }
     if (periodFrom && periodTo && periodTo < periodFrom) {
       return 'Invoice period: "to" date must be on or after "from" date';
+    }
+    // Expense category required if the status would create a daily-book entry
+    if ((status === 'deposited' || status === 'cleared') && !categoryId) {
+      return 'Expense category is required when status is Deposited or Cleared';
     }
     return null;
   };
@@ -98,19 +109,20 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
 
     setSaving(true);
     const payload = {
-      party_id:       partyId,
-      bank_id:        bankId,
-      is_online:      isOnline,
-      cheque_no:      isOnline ? null : chequeNo.trim(),
-      online_ref:     isOnline ? (onlineRef.trim() || null) : null,
+      party_id:            partyId,
+      account_id:          accountId,
+      expense_category_id: categoryId,
+      is_online:           isOnline,
+      cheque_no:           isOnline ? null : chequeNo.trim(),
+      online_ref:          isOnline ? (onlineRef.trim() || null) : null,
       amount,
-      issue_date:     issueDate,
-      deposit_date:   depositDate || null,
+      issue_date:          issueDate,
+      deposit_date:        depositDate || null,
       status,
-      remarks:        remarks.trim() || null,
-      ledger_no:      ledgerNo.trim() || null,
-      period_from:    periodFrom || null,
-      period_to:      periodTo || null,
+      remarks:             remarks.trim() || null,
+      ledger_no:           ledgerNo.trim() || null,
+      period_from:         periodFrom || null,
+      period_to:           periodTo || null,
     };
 
     if (isEdit && cheque) {
@@ -209,7 +221,7 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
                 ))}
                 {filteredParties.length === 0 && (
                   <div className="px-3 py-2 text-xs text-gray-500">
-                    No matches. <a href="/dashboard/cheques/parties" className="text-emerald-600 hover:underline">Add a new party</a> first.
+                    No matches. <a href="/manager/cheques/parties" className="text-emerald-600 hover:underline">Add a new party</a> first.
                   </div>
                 )}
               </div>
@@ -237,21 +249,41 @@ export default function ChequeModal({ cheque, parties, banks, onClose, onSaved, 
                 />
               </Field>
             )}
-            <Field label="Bank">
+            <Field label="Account *" hint="The bank/cash account this cheque is drawn on">
               <select
-                value={bankId ?? ''}
-                onChange={(e) => setBankId(e.target.value || null)}
-                className={inputCls(false)}
+                value={accountId ?? ''}
+                onChange={(e) => setAccountId(e.target.value || null)}
+                className={inputCls(!accountId)}
               >
-                <option value="">— None —</option>
-                {banks.filter((b) => b.is_active).map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}{b.is_default ? ' (default)' : ''}
-                  </option>
+                <option value="">— Pick account —</option>
+                {accounts.filter((a) => a.is_active).map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
                 ))}
               </select>
             </Field>
           </div>
+
+          {/* Expense Category — required for deposited/cleared so the trigger
+              creates a linked daily-book expense entry */}
+          <Field
+            label={`Expense Category ${(status === 'deposited' || status === 'cleared') ? '*' : ''}`}
+            hint={
+              (status === 'deposited' || status === 'cleared')
+                ? 'Required for cleared cheques — drives the auto-created Business Expense entry'
+                : 'Optional now; required when status moves to Deposited or Cleared'
+            }
+          >
+            <select
+              value={categoryId ?? ''}
+              onChange={(e) => setCategoryId(e.target.value || null)}
+              className={inputCls((status === 'deposited' || status === 'cleared') && !categoryId)}
+            >
+              <option value="">— Pick category —</option>
+              {expenseCategories.filter((c) => c.is_active).map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </Field>
 
           {/* Amount */}
           <Field label="Amount (₹) *">

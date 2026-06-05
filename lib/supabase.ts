@@ -263,6 +263,8 @@ export interface ImportBatch {
 // Cheques module — migration 010
 // ---------------------------------------------------------------------------
 
+/** @deprecated Bank table was dropped in migration 026 — use Account instead.
+ *  This stub kept only for any legacy reference; remove when no callers remain. */
 export interface Bank {
   id: string;
   name: string;
@@ -294,7 +296,8 @@ export type ChequeStatus = 'pending' | 'deposited' | 'cleared' | 'bounced' | 'ca
 export interface Cheque {
   id: string;
   party_id: string | null;
-  bank_id: string | null;
+  /** Account the cheque was drawn on (migration 026 — was bank_id). Required. */
+  account_id: string;
   is_online: boolean;
   cheque_no: string | null;
   online_ref: string | null;
@@ -311,6 +314,12 @@ export interface Cheque {
   period_from?: string | null;
   /** Last date of the invoice period this cheque settles (migration 015). */
   period_to?: string | null;
+  /** Business expense category (migration 027). Required for the trigger to
+   *  auto-create a linked daily_entries row on cleared/deposited cheques. */
+  expense_category_id?: string | null;
+  /** Auto-maintained by the trigger — points at the linked daily_entries row
+   *  (or NULL when cheque is pending/bounced/cancelled). */
+  linked_entry_id?: string | null;
   created_at: string;
   updated_at: string;
   created_by: string;

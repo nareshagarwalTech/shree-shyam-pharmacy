@@ -14,6 +14,7 @@ import {
   CreditCard,
   Scale,
   BarChart3,
+  FileText,
 } from 'lucide-react';
 import { PHARMACY_INFO } from '@/lib/constants';
 
@@ -58,6 +59,14 @@ const TILES: Tile[] = [
     icon: Scale,
     iconBg: 'bg-teal-100',
     iconColor: 'text-teal-600',
+  },
+  {
+    href: '/manager/cheques',
+    title: 'Cheques',
+    desc: 'Issued cheques + online transfers. Auto-creates linked expense entries on Cleared / Deposited.',
+    icon: FileText,
+    iconBg: 'bg-cyan-100',
+    iconColor: 'text-cyan-600',
   },
   {
     href: '/manager/daily-book/banks',

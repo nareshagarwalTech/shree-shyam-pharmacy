@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { supabase, ChequePartySummary, PartyCategory } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import DashboardHeader from '@/components/DashboardHeader';
 import Toast from '@/components/Toast';
 import useEscapeKey from '@/lib/useEscapeKey';
 import {
@@ -119,20 +118,22 @@ export default function PartiesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <DashboardHeader />
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <Link href="/manager/cheques" className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Manager · Cheques · Parties</div>
+            <h1 className="font-display font-bold text-gray-900 flex items-center gap-2">
+              <Users className="w-5 h-5 text-emerald-600" /> Party Master
+            </h1>
+          </div>
+        </div>
+      </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex items-start justify-between gap-3 mb-6">
           <div>
-            <Link
-              href="/dashboard/cheques"
-              className="inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 mb-1"
-            >
-              <ArrowLeft className="w-4 h-4" /> Back to Cheques
-            </Link>
-            <h1 className="text-2xl font-display font-bold text-gray-900 flex items-center gap-2">
-              <Users className="w-6 h-6 text-emerald-600" />
-              Party Master
-            </h1>
             <p className="text-sm text-gray-500">Vendors, staff, and services we issue cheques to.</p>
           </div>
           <button

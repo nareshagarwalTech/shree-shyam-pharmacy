@@ -94,16 +94,7 @@ const GROUPS: NavGroup[] = [
       { href: '/dashboard/groups',              label: 'Groups',           desc: 'Tags + segmentation',      icon: Tags },
     ],
   },
-  {
-    label: 'Cheques',
-    icon: Wallet,
-    items: [
-      { href: '/dashboard/cheques',             label: 'Cheques',          desc: 'Issued cheques + online',     icon: Wallet },
-      { href: '/dashboard/cheques/deposits',    label: 'Deposit Schedule', desc: 'What hits the bank when',      icon: Calendar },
-      { href: '/dashboard/cheques/parties',     label: 'Parties',          desc: 'Vendors / staff master',      icon: Users },
-      { href: '/dashboard/cheques/banks',       label: 'Banks',            desc: 'Bank accounts',                icon: Banknote },
-    ],
-  },
+  // Cheques moved to the Manager console (migration 026/027).
 ];
 
 // Right-side overflow menu (low-frequency items)

@@ -151,20 +151,7 @@ export default function ReportsHubPage() {
             desc="Every reminder sent. Delivery / read status. Failed sends."
             color="purple"
           />
-          <ReportCard
-            href="/dashboard/cheques"
-            icon={<Wallet className="w-6 h-6" />}
-            title="Cheques"
-            desc="Cheques + online transfers issued to vendors. Track pending, cleared, bounced."
-            color="emerald"
-          />
-          <ReportCard
-            href="/dashboard/cheques/deposits"
-            icon={<Calendar className="w-6 h-6" />}
-            title="Deposit Schedule"
-            desc="Pick a date — see exactly how much money needs to be in the bank."
-            color="amber"
-          />
+          {/* Cheques moved to the Manager console (migration 026/027). */}
         </div>
 
         <div className="mt-8 bg-white border border-gray-100 rounded-xl p-5">

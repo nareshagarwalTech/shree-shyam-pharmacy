@@ -5,13 +5,13 @@ import Link from 'next/link';
 import {
   supabase,
   Cheque,
-  Bank,
+  Account,
+  Category,
   Party,
   ChequeSummary,
   ChequeStatus,
 } from '@/lib/supabase';
 import { formatDate } from '@/lib/utils';
-import DashboardHeader from '@/components/DashboardHeader';
 import Toast from '@/components/Toast';
 import ChequeModal from '@/components/ChequeModal';
 import {
@@ -24,10 +24,10 @@ import {
   Clock,
   Pencil,
   Wallet,
-  Banknote,
   CreditCard,
   Users,
   Calendar,
+  ArrowLeft,
 } from 'lucide-react';
 
 type StatusFilter = 'all' | ChequeStatus;
@@ -35,7 +35,8 @@ type StatusFilter = 'all' | ChequeStatus;
 export default function ChequesPage() {
   const [cheques, setCheques]   = useState<Cheque[]>([]);
   const [parties, setParties]   = useState<Party[]>([]);
-  const [banks, setBanks]       = useState<Bank[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<Category[]>([]);
   const [summary, setSummary]   = useState<ChequeSummary | null>(null);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -48,16 +49,24 @@ export default function ChequesPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const fetchAll = useCallback(async () => {
-    const [c, p, b, s] = await Promise.all([
+    const [c, p, a, cat, s] = await Promise.all([
       supabase.from('cheques').select('*').order('issue_date', { ascending: false }).limit(500),
       supabase.from('parties').select('*').order('name'),
-      supabase.from('banks').select('*').order('name'),
+      supabase.from('accounts').select('*').eq('is_active', true).order('sort_order'),
+      supabase
+        .from('categories')
+        .select('*')
+        .eq('direction', 'expense')
+        .eq('scope', 'business')
+        .eq('is_active', true)
+        .order('sort_order'),
       supabase.from('cheque_summary').select('*').single(),
     ]);
     if (c.error)  setToast({ message: c.error.message, type: 'error' });
     else          setCheques((c.data || []) as Cheque[]);
     if (p.data)   setParties(p.data as Party[]);
-    if (b.data)   setBanks(b.data as Bank[]);
+    if (a.data)   setAccounts(a.data as Account[]);
+    if (cat.data) setExpenseCategories(cat.data as Category[]);
     if (s.data)   setSummary(s.data as ChequeSummary);
     setLoading(false);
     setRefreshing(false);
@@ -105,18 +114,18 @@ export default function ChequesPage() {
   };
 
   const exportCsv = () => {
-    const headers = ['Cheque Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Bank', 'Ledger No', 'Period From', 'Period To', 'Status', 'Deposit Date', 'Remarks'];
+    const headers = ['Cheque Date', 'Party', 'Cheque No.', 'Online', 'Amount', 'Account', 'Ledger No', 'Period From', 'Period To', 'Status', 'Deposit Date', 'Remarks'];
     const lines = [headers.join(',')];
     for (const c of filtered) {
       const party = c.party_id ? partyMap.get(c.party_id)?.name ?? '' : '';
-      const bank = banks.find((b) => b.id === c.bank_id)?.name ?? '';
+      const account = accounts.find((a) => a.id === c.account_id)?.name ?? '';
       lines.push([
         c.issue_date,
         `"${party.replace(/"/g, '""')}"`,
         c.is_online ? 'ONLINE' : (c.cheque_no ?? ''),
         c.is_online ? 'Y' : 'N',
         c.amount,
-        `"${bank.replace(/"/g, '""')}"`,
+        `"${account.replace(/"/g, '""')}"`,
         `"${(c.ledger_no ?? '').replace(/"/g, '""')}"`,
         c.period_from ?? '',
         c.period_to ?? '',
@@ -134,35 +143,38 @@ export default function ChequesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <DashboardHeader />
+      {/* Manager-tier header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <Link href="/manager" className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600">
+            <ArrowLeft className="w-5 h-5" />
+          </Link>
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Manager · Cheques</div>
+            <h1 className="font-display font-bold text-gray-900 flex items-center gap-2">
+              <Wallet className="w-5 h-5 text-emerald-600" /> Cheques
+            </h1>
+          </div>
+        </div>
+      </header>
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Title row */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
           <div className="min-w-0">
-            <h1 className="text-2xl font-display font-bold text-gray-900 flex items-center gap-2">
-              <Wallet className="w-6 h-6 text-emerald-600" />
-              Cheques
-            </h1>
-            <p className="text-sm text-gray-500">Track cheques + online transfers issued to vendors.</p>
+            <p className="text-sm text-gray-500">Track cheques + online transfers issued to vendors. Auto-creates linked Business Expense entries when status hits Deposited or Cleared.</p>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
             <Link
-              href="/dashboard/cheques/deposits"
+              href="/manager/cheques/deposits"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-sm font-medium"
             >
               <Calendar className="w-4 h-4" /> Deposit Schedule
             </Link>
             <Link
-              href="/dashboard/cheques/parties"
+              href="/manager/cheques/parties"
               className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium"
             >
               <Users className="w-4 h-4" /> Parties
-            </Link>
-            <Link
-              href="/dashboard/cheques/banks"
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-700 text-sm font-medium"
-            >
-              <Banknote className="w-4 h-4" /> Banks
             </Link>
             <button
               onClick={() => { setRefreshing(true); fetchAll(); }}
@@ -429,7 +441,8 @@ export default function ChequesPage() {
         <ChequeModal
           cheque={editing}
           parties={parties}
-          banks={banks}
+          accounts={accounts}
+          expenseCategories={expenseCategories}
           onClose={() => setEditing(undefined)}
           onSaved={() => {
             setEditing(undefined);

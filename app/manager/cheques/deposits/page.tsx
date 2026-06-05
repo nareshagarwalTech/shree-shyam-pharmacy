@@ -9,7 +9,6 @@ import {
   ChequeDepositScheduleRow,
 } from '@/lib/supabase';
 import { formatDate, todayISO } from '@/lib/utils';
-import DashboardHeader from '@/components/DashboardHeader';
 import Toast from '@/components/Toast';
 import {
   ArrowLeft,
@@ -124,24 +123,24 @@ export default function DepositScheduleReport() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50">
-      <DashboardHeader />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="mb-6">
-          <Link
-            href="/dashboard/cheques"
-            className="inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700 mb-1"
-          >
-            <ArrowLeft className="w-4 h-4" /> Back to Cheques
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center gap-3">
+          <Link href="/manager/cheques" className="p-2 -ml-2 rounded-lg hover:bg-gray-100 text-gray-600">
+            <ArrowLeft className="w-5 h-5" />
           </Link>
-          <h1 className="text-2xl font-display font-bold text-gray-900 flex items-center gap-2">
-            <Calendar className="w-6 h-6 text-emerald-600" />
-            Deposit Schedule
-          </h1>
-          <p className="text-sm text-gray-500">
-            Pick a date to see all the cheques pending deposit on that day —
-            so you know how much money needs to be in the bank.
-          </p>
+          <div className="flex-1">
+            <div className="text-xs uppercase tracking-wider text-emerald-700 font-semibold">Manager · Cheques · Deposits</div>
+            <h1 className="font-display font-bold text-gray-900 flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-emerald-600" /> Deposit Schedule
+            </h1>
+          </div>
         </div>
+      </header>
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <p className="text-sm text-gray-500 mb-4">
+          Pick a date to see all the cheques pending deposit on that day —
+          so you know how much money needs to be in the bank.
+        </p>
 
         {/* Date picker controls */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3 sm:p-4 mb-6">
