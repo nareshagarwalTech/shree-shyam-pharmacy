@@ -13,6 +13,7 @@ import {
   Tags,
   CreditCard,
   Scale,
+  BarChart3,
 } from 'lucide-react';
 import { PHARMACY_INFO } from '@/lib/constants';
 
@@ -43,12 +44,20 @@ const TILES: Tile[] = [
     iconColor: 'text-amber-600',
   },
   {
-    href: '/manager/daily-book/cash-log',
-    title: 'Cash Log',
-    desc: 'Daily history: opening, closing, derived sales, expenses. Totals row.',
-    icon: Scale,
+    href: '/manager/daily-book/daily-report',
+    title: 'Daily Report',
+    desc: 'Pick a date → Total Sales, expenses, P&L, cash drawer status. Printable.',
+    icon: BarChart3,
     iconBg: 'bg-emerald-100',
     iconColor: 'text-emerald-600',
+  },
+  {
+    href: '/manager/daily-book/cash-log',
+    title: 'Cash Log',
+    desc: 'Multi-day cash history: opening, closing, derived sales, totals.',
+    icon: Scale,
+    iconBg: 'bg-teal-100',
+    iconColor: 'text-teal-600',
   },
   {
     href: '/manager/daily-book/banks',
