@@ -12,7 +12,7 @@ import {
 } from '@/lib/supabase';
 import {
   ArrowLeft, Calendar, RefreshCw, Printer,
-  TrendingUp, TrendingDown, Wallet, Landmark,
+  TrendingUp, TrendingDown, Wallet,
   AlertTriangle, CheckCircle2, Receipt, CreditCard, Tags,
   Briefcase, Home, BarChart3,
 } from 'lucide-react';
@@ -251,6 +251,74 @@ export default function DailyReportPage() {
           </div>
         )}
 
+        {/* === ACCOUNT BALANCES — opening / movement / closing per account === */}
+        {balances.length > 0 && (
+          <Card icon={Wallet} iconColor="text-indigo-600" headerBg="bg-indigo-50/50"
+                title="Account Balances · Opening → Closing">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="text-left  px-4 py-2 font-semibold text-gray-700">Account</th>
+                    <th className="text-right px-4 py-2 font-semibold text-gray-700">Opening Balance</th>
+                    <th className="text-right px-4 py-2 font-semibold text-gray-700">Net Change Today</th>
+                    <th className="text-right px-4 py-2 font-semibold text-gray-700">Closing Balance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {balances.map((b) => {
+                    const opening = Number(b.opening_today);
+                    const closing = Number(b.closing_today);
+                    const net = closing - opening;
+                    const netPositive = net >= 0;
+                    const closingNeg = closing < 0;
+                    const isCash = b.account_kind === 'cash';
+                    return (
+                      <tr key={b.account_id} className="border-b border-gray-100 last:border-0">
+                        <td className="px-4 py-2.5 font-medium text-gray-900">
+                          {isCash ? '💵' : '🏦'} {b.account_name}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-gray-800">
+                          ₹{fmtINR(opening)}
+                        </td>
+                        <td className={`px-4 py-2.5 text-right tabular-nums font-semibold ${
+                          net === 0 ? 'text-gray-400' : netPositive ? 'text-emerald-700' : 'text-rose-700'
+                        }`}>
+                          {net === 0 ? '—' : `${netPositive ? '+' : '−'}₹${fmtINR(Math.abs(net))}`}
+                        </td>
+                        <td className={`px-4 py-2.5 text-right tabular-nums font-bold ${
+                          closingNeg ? 'text-rose-700' : 'text-gray-900'
+                        }`}>
+                          ₹{fmtINR(closing)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  {/* Totals row */}
+                  <tr className="bg-indigo-50 border-t-2 border-indigo-200 font-bold">
+                    <td className="px-4 py-2.5 text-indigo-900">TOTAL across all accounts</td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-indigo-900">
+                      ₹{fmtINR(balances.reduce((s, b) => s + Number(b.opening_today), 0))}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-indigo-900">
+                      {(() => {
+                        const totalNet = balances.reduce((s, b) => s + (Number(b.closing_today) - Number(b.opening_today)), 0);
+                        return `${totalNet >= 0 ? '+' : '−'}₹${fmtINR(Math.abs(totalNet))}`;
+                      })()}
+                    </td>
+                    <td className="px-4 py-2.5 text-right tabular-nums text-indigo-900">
+                      ₹{fmtINR(balances.reduce((s, b) => s + Number(b.closing_today), 0))}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <div className="bg-gray-50 px-4 py-2 text-[11px] text-gray-600 border-t border-gray-200">
+                💡 Closing Balance of {date} becomes Opening Balance of the next day automatically.
+              </div>
+            </div>
+          </Card>
+        )}
+
         {/* HERO: Total Sales */}
         <div className="bg-gradient-to-br from-emerald-500 to-emerald-700 rounded-2xl p-6 text-white shadow-lg print:bg-emerald-700 print:shadow-none">
           <div className="text-xs uppercase tracking-wider text-emerald-100 font-semibold mb-1">
@@ -427,27 +495,6 @@ export default function DailyReportPage() {
             </div>
           </div>
         </Card>
-
-        {/* Bank accounts at end of day */}
-        {balances.filter((b) => b.account_kind !== 'cash').length > 0 && (
-          <Card icon={Landmark} iconColor="text-purple-600" headerBg="bg-purple-50/40" title="Bank Account Balances">
-            <table className="w-full text-sm">
-              <tbody>
-                {balances.filter((b) => b.account_kind !== 'cash').map((b) => (
-                  <tr key={b.account_id} className="border-b border-gray-100 last:border-0">
-                    <td className="px-4 py-2 text-gray-800">🏦 {b.account_name}</td>
-                    <td className="px-4 py-2 text-right text-xs text-gray-500">
-                      opening ₹{fmtINR(Number(b.opening_today))} →
-                    </td>
-                    <td className="px-4 py-2 text-right tabular-nums font-semibold text-gray-900">
-                      ₹{fmtINR(Number(b.closing_today))}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-        )}
 
         {/* Footer (hidden on print) */}
         <div className="text-xs text-gray-500 text-center pt-2 print:hidden">
